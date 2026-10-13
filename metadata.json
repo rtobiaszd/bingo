@@ -1,0 +1,6 @@
+{
+  "name": "Bingo Real-Time Club",
+  "description": "Jogo de Bingo online multiplayer com salas privadas, sorteio automático com voz narradora, personalização de cartelas em tempo real e chat integrado.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

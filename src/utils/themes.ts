@@ -1,0 +1,87 @@
+import { CardTheme, MarkerStyle } from '../types/bingo';
+
+export const CARD_THEMES: CardTheme[] = [
+  {
+    id: 'casino_gold',
+    name: 'Casino Imperial',
+    cardBg: 'bg-zinc-900',
+    cardBorder: 'border-amber-500/40 shadow-amber-950/40',
+    headerBg: 'bg-gradient-to-r from-amber-600 via-amber-500 to-amber-700',
+    headerText: 'text-zinc-950 font-bold',
+    cellBg: 'bg-zinc-800/80',
+    cellText: 'text-zinc-100',
+    cellBorder: 'border-zinc-700/60',
+    markedBg: 'bg-amber-500/20',
+    markedText: 'text-amber-300 font-extrabold',
+    accent: '#f59e0b',
+  },
+  {
+    id: 'emerald_velvet',
+    name: 'Esmeralda Clássico',
+    cardBg: 'bg-emerald-950/80',
+    cardBorder: 'border-emerald-500/40 shadow-emerald-950/50',
+    headerBg: 'bg-gradient-to-r from-emerald-600 to-teal-600',
+    headerText: 'text-white font-bold',
+    cellBg: 'bg-emerald-900/60',
+    cellText: 'text-emerald-50',
+    cellBorder: 'border-emerald-700/40',
+    markedBg: 'bg-emerald-500/30',
+    markedText: 'text-emerald-200 font-extrabold',
+    accent: '#10b981',
+  },
+  {
+    id: 'neon_cyber',
+    name: 'Neon Vegas',
+    cardBg: 'bg-slate-950',
+    cardBorder: 'border-cyan-500/50 shadow-cyan-950/50',
+    headerBg: 'bg-gradient-to-r from-cyan-500 via-fuchsia-500 to-pink-500',
+    headerText: 'text-white font-bold',
+    cellBg: 'bg-slate-900/90',
+    cellText: 'text-cyan-100',
+    cellBorder: 'border-cyan-800/40',
+    markedBg: 'bg-cyan-500/25',
+    markedText: 'text-pink-300 font-extrabold',
+    accent: '#06b6d4',
+  },
+  {
+    id: 'vintage_sepia',
+    name: 'Retrô Boteco',
+    cardBg: 'bg-amber-950/50',
+    cardBorder: 'border-amber-700/50 shadow-amber-950/40',
+    headerBg: 'bg-gradient-to-r from-amber-700 to-orange-800',
+    headerText: 'text-amber-100 font-bold',
+    cellBg: 'bg-amber-900/40',
+    cellText: 'text-amber-100',
+    cellBorder: 'border-amber-800/40',
+    markedBg: 'bg-red-500/25',
+    markedText: 'text-amber-200 font-extrabold',
+    accent: '#d97706',
+  },
+  {
+    id: 'clean_slate',
+    name: 'Minimal Dark',
+    cardBg: 'bg-slate-900',
+    cardBorder: 'border-slate-700 shadow-slate-950/60',
+    headerBg: 'bg-slate-800',
+    headerText: 'text-slate-100 font-bold',
+    cellBg: 'bg-slate-950/70',
+    cellText: 'text-slate-200',
+    cellBorder: 'border-slate-800',
+    markedBg: 'bg-blue-600/20',
+    markedText: 'text-blue-300 font-extrabold',
+    accent: '#3b82f6',
+  },
+];
+
+export const MARKER_STYLES: MarkerStyle[] = [
+  { id: 'stamp_gold', name: 'Carimbo Dourado', iconName: 'stamp', color: '#f59e0b' },
+  { id: 'clover_green', name: 'Trevo da Sorte', iconName: 'clover', color: '#10b981' },
+  { id: 'star_amber', name: 'Estrela Brilhante', iconName: 'star', color: '#eab308' },
+  { id: 'heart_ruby', name: 'Coração Rubi', iconName: 'heart', color: '#ef4444' },
+  { id: 'flame_fire', name: 'Fogo Campeão', iconName: 'flame', color: '#f97316' },
+  { id: 'chip_circle', name: 'Ficha Cassino', iconName: 'circle', color: '#06b6d4' },
+];
+
+export const AVATARS = [
+  '🎲', '🍀', '👑', '⭐', '🦁', '🦉', '💎', '🎯', '🐱', '🚀', '🔥', '🏆'
+];
