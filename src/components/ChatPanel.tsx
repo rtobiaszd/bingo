@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, MessageSquare, Sparkles } from 'lucide-react';
+import { Send, MessageSquare } from 'lucide-react';
 import { ChatMessage } from '../types/bingo';
 
 interface ChatPanelProps {
@@ -16,7 +16,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const [inputText, setInputText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const quickReactions = ['🍀 Boa Sorte!', '👏 Parabéns!', '🎺 BINGO!', '🔥 Essa é minha!', '😱 Quase!'];
+  const quickReactions = ['Boa sorte a todos', 'Parabéns!', 'Quase lá!', 'Essa é minha!'];
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -30,22 +30,22 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   };
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl flex flex-col h-full overflow-hidden shadow-xl">
+    <div className="bg-[#18191e] border border-zinc-800 rounded-lg flex flex-col h-full overflow-hidden shadow-sm">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between bg-zinc-950/60">
+      <div className="px-3.5 py-2.5 border-b border-zinc-800 flex items-center justify-between bg-[#141518]">
         <div className="flex items-center gap-2">
-          <MessageSquare className="w-4 h-4 text-amber-400" />
-          <span className="text-xs font-bold text-zinc-100 uppercase tracking-wider">
-            Chat da Sala
+          <MessageSquare className="w-3.5 h-3.5 text-zinc-400" />
+          <span className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">
+            Chat ao Vivo
           </span>
         </div>
-        <span className="text-[11px] text-zinc-500 font-mono">
-          {messages.length} mensagens
+        <span className="text-[11px] text-zinc-500 font-mono tabular-nums">
+          {messages.length} msgs
         </span>
       </div>
 
       {/* Messages Scroll Area */}
-      <div className="flex-1 p-3 overflow-y-auto space-y-2.5 min-h-[220px] max-h-[380px] scrollbar-thin">
+      <div className="flex-1 p-3 overflow-y-auto space-y-2 min-h-[200px] max-h-[360px] scrollbar-thin">
         {messages.map((msg) => {
           const isMe = msg.senderId === currentPlayerId;
 
@@ -53,7 +53,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             return (
               <div
                 key={msg.id}
-                className="py-1 px-2.5 rounded-lg bg-zinc-950/70 border border-zinc-800/60 text-center text-[11px] text-zinc-400 font-mono"
+                className="py-1 px-2 rounded bg-zinc-900/60 border border-zinc-800/50 text-center text-[11px] text-zinc-400 font-mono"
               >
                 {msg.text}
               </div>
@@ -64,7 +64,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             return (
               <div
                 key={msg.id}
-                className="py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500/20 via-amber-600/20 to-amber-500/20 border border-amber-500/50 text-center text-xs font-black text-amber-200 shadow-md"
+                className="py-2 px-3 rounded-md bg-emerald-950/40 border border-emerald-500/40 text-center text-xs font-bold text-emerald-300"
               >
                 {msg.text}
               </div>
@@ -76,12 +76,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               key={msg.id}
               className={`flex flex-col text-xs ${isMe ? 'items-end' : 'items-start'}`}
             >
-              <div className="flex items-center gap-1.5 mb-0.5 px-1">
-                <span className="text-xs">{msg.senderAvatar || '🎲'}</span>
-                <span className="text-[11px] font-bold text-zinc-400">
+              <div className="flex items-center gap-1.5 mb-0.5 px-0.5">
+                <span className="text-[11px] font-medium text-zinc-400">
                   {isMe ? 'Você' : msg.senderName}
                 </span>
-                <span className="text-[9px] text-zinc-600 font-mono">
+                <span className="text-[9px] text-zinc-600 font-mono tabular-nums">
                   {new Date(msg.timestamp).toLocaleTimeString([], {
                     hour: '2-digit',
                     minute: '2-digit',
@@ -89,10 +88,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 </span>
               </div>
               <div
-                className={`py-1.5 px-3 rounded-2xl max-w-[85%] break-words leading-relaxed ${
+                className={`py-1.5 px-2.5 rounded-md max-w-[85%] break-words leading-relaxed text-xs ${
                   isMe
-                    ? 'bg-amber-500 text-zinc-950 font-medium rounded-tr-none shadow-sm'
-                    : 'bg-zinc-800 text-zinc-100 rounded-tl-none border border-zinc-700/60'
+                    ? 'bg-zinc-800 text-zinc-100 font-normal border border-zinc-700/80'
+                    : 'bg-[#202227] text-zinc-300 border border-zinc-800'
                 }`}
               >
                 {msg.text}
@@ -103,13 +102,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Quick Reaction Pill-Strip */}
-      <div className="px-3 py-2 border-t border-zinc-800/80 bg-zinc-950/40 flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+      {/* Quick Reaction Pills */}
+      <div className="px-2.5 py-1.5 border-t border-zinc-800 bg-[#141518] flex items-center gap-1.5 overflow-x-auto scrollbar-none">
         {quickReactions.map((reaction) => (
           <button
             key={reaction}
             onClick={() => onSendMessage(reaction)}
-            className="px-2.5 py-1 text-[11px] font-medium text-zinc-300 bg-zinc-800/80 hover:bg-zinc-700 hover:text-white rounded-lg transition-colors whitespace-nowrap shrink-0 border border-zinc-700/50"
+            className="px-2 py-0.5 text-[11px] text-zinc-400 hover:text-zinc-200 bg-zinc-850 hover:bg-zinc-800 rounded border border-zinc-800 transition-colors whitespace-nowrap shrink-0"
           >
             {reaction}
           </button>
@@ -117,21 +116,21 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       </div>
 
       {/* Input form */}
-      <form onSubmit={handleSubmit} className="p-3 border-t border-zinc-800 bg-zinc-950 flex gap-2">
+      <form onSubmit={handleSubmit} className="p-2.5 border-t border-zinc-800 bg-[#141518] flex gap-2">
         <input
           type="text"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
-          placeholder="Envie uma mensagem..."
+          placeholder="Mensagem..."
           maxLength={140}
-          className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400 transition-colors"
+          className="flex-1 bg-zinc-900 border border-zinc-800 rounded-md px-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 transition-colors"
         />
         <button
           type="submit"
           disabled={!inputText.trim()}
-          className="p-2 bg-amber-400 hover:bg-amber-300 disabled:bg-zinc-800 text-zinc-950 disabled:text-zinc-600 rounded-xl transition-all shadow-sm"
+          className="px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-zinc-200 rounded-md transition-all cursor-pointer"
         >
-          <Send className="w-4 h-4" />
+          <Send className="w-3.5 h-3.5" />
         </button>
       </form>
     </div>

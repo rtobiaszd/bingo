@@ -140,22 +140,22 @@ export function getBallColor(num: number, mode: BingoMode): string {
     const letter = get75BallLetter(num);
     switch (letter) {
       case 'B':
-        return '#3b82f6'; // blue
+        return '#3b82f6'; // cobalt
       case 'I':
-        return '#ef4444'; // red
+        return '#f43f5e'; // muted coral
       case 'N':
-        return '#10b981'; // emerald
+        return '#10b981'; // mint
       case 'G':
         return '#f59e0b'; // amber
       case 'O':
-        return '#8b5cf6'; // purple
+        return '#8b5cf6'; // iris
     }
   }
-  // 90 balls palette by tens
+  // 90 balls palette by tens (clean matte tones)
   const tens = Math.floor((num - 1) / 10);
   const colors = [
     '#3b82f6',
-    '#06b6d4',
+    '#0ea5e9',
     '#10b981',
     '#84cc16',
     '#eab308',
@@ -164,7 +164,7 @@ export function getBallColor(num: number, mode: BingoMode): string {
     '#ec4899',
     '#8b5cf6',
   ];
-  return colors[tens] || '#64748b';
+  return colors[tens] || '#52525b';
 }
 
 export interface VictoryCheckResult {

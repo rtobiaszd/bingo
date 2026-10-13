@@ -152,10 +152,10 @@ class MultiplayerService {
     const hostPlayer: PlayerProfile = {
       id: playerId,
       name: hostName.trim() || 'Anfitrião',
-      avatar: avatar || '👑',
+      avatar: avatar || '👤',
       isHost: true,
-      themeId: 'casino_gold',
-      markerId: 'stamp_gold',
+      themeId: 'grafite_menta',
+      markerId: 'fill_solid',
       cardNumbers: initialCard,
       markedCells,
       joinedAt: Date.now(),
@@ -217,10 +217,10 @@ class MultiplayerService {
     const newPlayer: PlayerProfile = {
       id: playerId,
       name: playerName.trim() || 'Jogador ' + Math.floor(Math.random() * 100),
-      avatar: avatar || '🎲',
+      avatar: avatar || '👤',
       isHost: false,
-      themeId: 'casino_gold',
-      markerId: 'stamp_gold',
+      themeId: 'grafite_menta',
+      markerId: 'fill_solid',
       cardNumbers: card,
       markedCells,
       joinedAt: Date.now(),
@@ -599,11 +599,11 @@ class MultiplayerService {
     if (!room || !this.isCurrentPlayerHost(room)) return;
 
     const botNames = [
-      { name: 'Dona Neusa', avatar: '👵', theme: 'vintage_sepia' },
-      { name: 'Vovô Tonho', avatar: '👴', theme: 'casino_gold' },
-      { name: 'Carlinhos 77', avatar: '🍀', theme: 'emerald_velvet' },
-      { name: 'Bia do Bingo', avatar: '👑', theme: 'neon_cyber' },
-      { name: 'Marcão da Sorte', avatar: '🔥', theme: 'casino_gold' },
+      { name: 'Neusa Silva', avatar: '☕', theme: 'nordico_claro' },
+      { name: 'Antonio M.', avatar: '👓', theme: 'grafite_menta' },
+      { name: 'Carlos Santos', avatar: '⚡', theme: 'grafite_laranja' },
+      { name: 'Beatriz Lima', avatar: '✦', theme: 'ardosia_cobalto' },
+      { name: 'Marcos R.', avatar: '🌿', theme: 'areia_carvao' },
     ];
 
     const currentNames = new Set(Object.values(room.players).map((p) => p.name));
@@ -631,7 +631,7 @@ class MultiplayerService {
         isHost: false,
         isBot: true,
         themeId: bot.theme,
-        markerId: 'stamp_gold',
+        markerId: 'fill_solid',
         cardNumbers: card,
         markedCells: marked,
         joinedAt: Date.now(),

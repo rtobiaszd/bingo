@@ -7,7 +7,7 @@ export type RoomStatus = 'WAITING' | 'PLAYING' | 'PAUSED' | 'FINISHED';
 export interface MarkerStyle {
   id: string;
   name: string;
-  iconName: 'circle' | 'clover' | 'star' | 'heart' | 'stamp' | 'flame';
+  iconName: 'fill' | 'dot' | 'check' | 'ring' | 'cross' | 'circle' | 'clover' | 'star' | 'heart' | 'stamp' | 'flame';
   color: string;
 }
 

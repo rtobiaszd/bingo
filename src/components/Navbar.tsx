@@ -1,6 +1,5 @@
 import React from 'react';
-import { Volume2, VolumeX, Mic, MicOff, Palette, Grid3X3, LogOut, Sparkles } from 'lucide-react';
-import { soundService } from '../services/soundService';
+import { Volume2, VolumeX, Mic, MicOff, Palette, Grid3X3, LogOut, Sliders } from 'lucide-react';
 
 interface NavbarProps {
   roomCode?: string;
@@ -26,84 +25,83 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleSpeech,
 }) => {
   return (
-    <header className="sticky top-0 z-40 bg-zinc-950/90 backdrop-blur-md border-b border-zinc-800/80 px-4 md:px-8 py-3.5 flex items-center justify-between gap-8 transition-all">
+    <header className="sticky top-0 z-40 bg-[#121316]/95 backdrop-blur-md border-b border-zinc-800/80 px-4 md:px-8 py-3 flex items-center justify-between gap-8 transition-all">
       {/* Zone 1: Brand Wordmark */}
       <div className="flex items-center gap-3 shrink-0">
-        <a href="/" className="flex items-center gap-2 group">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center text-zinc-950 font-black shadow-md shadow-amber-500/20 group-hover:scale-105 transition-transform">
+        <a href="/" className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-md bg-zinc-800 border border-zinc-700/80 flex items-center justify-center text-zinc-100 font-bold text-xs font-mono">
             B
           </div>
-          <span className="text-lg font-bold tracking-tight text-zinc-100 whitespace-nowrap">
-            Bingo Real-Time Club
+          <span className="text-base font-semibold tracking-tight text-zinc-100 whitespace-nowrap">
+            Bingo Club
           </span>
         </a>
         {roomCode && (
           <div className="hidden sm:flex items-center gap-2 pl-3 border-l border-zinc-800 text-xs text-zinc-400">
-            <span>Sala:</span>
-            <span className="font-mono font-bold text-amber-400 bg-zinc-900 px-2 py-0.5 rounded border border-zinc-800">
+            <span>Sala</span>
+            <span className="font-mono font-semibold text-zinc-200 bg-zinc-850 px-2 py-0.5 rounded border border-zinc-700/60 tabular-nums">
               {roomCode}
             </span>
             <span className="text-zinc-600">·</span>
-            <span>{roomMode === 'BINGO_75' ? '75 Bolas' : '90 Bolas'}</span>
+            <span className="text-zinc-400">{roomMode === 'BINGO_75' ? '75 Bolas' : '90 Bolas'}</span>
           </div>
         )}
       </div>
 
-      {/* Zone 2: Navigation & Tool Controls */}
+      {/* Zone 2: Navigation & Controls */}
       <nav className="hidden md:flex items-center gap-5 text-xs font-medium text-zinc-400">
         <button
           onClick={onOpenCustomizer}
-          className="flex items-center gap-1.5 hover:text-amber-400 transition-colors whitespace-nowrap shrink-0 py-1"
+          className="flex items-center gap-1.5 hover:text-zinc-200 transition-colors whitespace-nowrap shrink-0 py-1"
         >
-          <Palette className="w-4 h-4 text-amber-500" />
-          <span>Personalizar Cartela</span>
+          <Palette className="w-3.5 h-3.5 text-zinc-400" />
+          <span>Visual da Cartela</span>
         </button>
 
         <button
           onClick={onOpenBoard}
-          className="flex items-center gap-1.5 hover:text-amber-400 transition-colors whitespace-nowrap shrink-0 py-1"
+          className="flex items-center gap-1.5 hover:text-zinc-200 transition-colors whitespace-nowrap shrink-0 py-1"
         >
-          <Grid3X3 className="w-4 h-4 text-zinc-400" />
-          <span>Quadro Geral</span>
+          <Grid3X3 className="w-3.5 h-3.5 text-zinc-400" />
+          <span>Quadro de Pedras</span>
         </button>
 
-        <div className="flex items-center gap-2 pl-3 border-l border-zinc-800">
+        <div className="flex items-center gap-1.5 pl-3 border-l border-zinc-800">
           <button
             onClick={onToggleSpeech}
             title={speechActive ? 'Voz de locução ativada' : 'Voz de locução desativada'}
             className={`p-1.5 rounded-md transition-colors ${
-              speechActive ? 'text-amber-400 bg-amber-500/10' : 'text-zinc-600 hover:text-zinc-400'
+              speechActive ? 'text-emerald-400 bg-emerald-500/10' : 'text-zinc-500 hover:text-zinc-300'
             }`}
           >
-            {speechActive ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+            {speechActive ? <Mic className="w-3.5 h-3.5" /> : <MicOff className="w-3.5 h-3.5" />}
           </button>
 
           <button
             onClick={onToggleSfx}
             title={sfxActive ? 'Efeitos sonoros ativados' : 'Efeitos sonoros desativados'}
             className={`p-1.5 rounded-md transition-colors ${
-              sfxActive ? 'text-emerald-400 bg-emerald-500/10' : 'text-zinc-600 hover:text-zinc-400'
+              sfxActive ? 'text-emerald-400 bg-emerald-500/10' : 'text-zinc-500 hover:text-zinc-300'
             }`}
           >
-            {sfxActive ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            {sfxActive ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
           </button>
         </div>
       </nav>
 
       {/* Zone 3: 1 Primary Action */}
-      <div className="flex items-center gap-2.5 shrink-0">
-        {/* Mobile quick tools */}
+      <div className="flex items-center gap-2 shrink-0">
         <div className="flex md:hidden items-center gap-1 mr-1">
           <button
             onClick={onOpenCustomizer}
-            className="p-2 text-amber-400 hover:bg-zinc-900 rounded-lg"
+            className="p-1.5 text-zinc-400 hover:text-zinc-200 rounded-md"
             title="Personalizar"
           >
             <Palette className="w-4 h-4" />
           </button>
           <button
             onClick={onOpenBoard}
-            className="p-2 text-zinc-400 hover:bg-zinc-900 rounded-lg"
+            className="p-1.5 text-zinc-400 hover:text-zinc-200 rounded-md"
             title="Quadro Geral"
           >
             <Grid3X3 className="w-4 h-4" />
@@ -113,18 +111,18 @@ export const Navbar: React.FC<NavbarProps> = ({
         {onLeaveRoom ? (
           <button
             onClick={onLeaveRoom}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-zinc-300 bg-zinc-900 border border-zinc-700/80 rounded-lg hover:bg-zinc-800 hover:text-white transition-colors whitespace-nowrap shrink-0"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-300 bg-zinc-800/80 border border-zinc-700/60 rounded-md hover:bg-zinc-800 hover:text-white transition-colors whitespace-nowrap shrink-0"
           >
-            <LogOut className="w-3.5 h-3.5 text-red-400" />
-            <span>Sair da Sala</span>
+            <LogOut className="w-3 h-3 text-red-400" />
+            <span>Sair</span>
           </button>
         ) : (
           <button
             onClick={onOpenCustomizer}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-zinc-950 bg-gradient-to-r from-amber-400 to-amber-500 rounded-lg hover:from-amber-300 hover:to-amber-400 transition-all shadow-sm shadow-amber-500/20 whitespace-nowrap shrink-0"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-zinc-950 bg-emerald-500 hover:bg-emerald-400 rounded-md transition-colors whitespace-nowrap shrink-0 shadow-sm"
           >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Configurar Cartela</span>
+            <Sliders className="w-3.5 h-3.5" />
+            <span>Preferências</span>
           </button>
         )}
       </div>

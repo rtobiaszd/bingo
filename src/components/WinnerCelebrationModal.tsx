@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trophy, Sparkles, RotateCcw } from 'lucide-react';
+import { CheckCircle2, RotateCcw } from 'lucide-react';
 import { WinnerAudit } from '../types/bingo';
 
 interface WinnerCelebrationModalProps {
@@ -18,64 +18,61 @@ export const WinnerCelebrationModal: React.FC<WinnerCelebrationModalProps> = ({
   if (!winner) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
-      <div className="bg-gradient-to-b from-zinc-900 to-zinc-950 border border-amber-500/40 rounded-3xl w-full max-w-md p-6 sm:p-8 text-center shadow-2xl relative overflow-hidden">
-        {/* Glow backdrop effect */}
-        <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-48 h-48 bg-amber-500/20 rounded-full blur-3xl pointer-events-none" />
-
-        {/* Trophy icon */}
-        <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center text-zinc-950 shadow-xl shadow-amber-500/30 mb-5 animate-bounce-subtle">
-          <Trophy className="w-10 h-10" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+      <div className="bg-[#18191e] border border-zinc-800 rounded-lg w-full max-w-sm p-6 text-center shadow-xl">
+        {/* Subtle Check Icon */}
+        <div className="w-12 h-12 mx-auto rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-4">
+          <CheckCircle2 className="w-6 h-6 stroke-[2]" />
         </div>
 
-        <span className="text-xs font-black uppercase tracking-widest text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20 inline-block mb-2">
-          Vitória Confirmada!
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-400 block mb-1">
+          BINGO VALIDADO
         </span>
 
-        <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight mb-1">
-          BINGO!
+        <h2 className="text-xl font-bold text-zinc-100 tracking-tight mb-4">
+          Rodada Encerrada
         </h2>
 
-        {/* Winner profile */}
-        <div className="my-5 p-4 rounded-2xl bg-zinc-900/80 border border-zinc-800 flex items-center justify-center gap-3">
-          <span className="text-3xl" role="img" aria-label="avatar">
+        {/* Winner profile card */}
+        <div className="p-3.5 rounded-md bg-[#202227] border border-zinc-800 flex items-center justify-center gap-3 mb-4">
+          <span className="text-xl" role="img" aria-label="avatar">
             {winner.winnerAvatar}
           </span>
           <div className="text-left">
-            <h3 className="text-base font-bold text-white leading-tight">
+            <h3 className="text-sm font-semibold text-zinc-100 leading-tight">
               {winner.winnerName}
             </h3>
-            <p className="text-xs text-amber-400 font-medium">
+            <p className="text-xs text-emerald-400 font-medium">
               {winner.winningPattern}
             </p>
           </div>
         </div>
 
-        <p className="text-xs text-zinc-400 mb-6">
-          A cartela foi auditada pelo sistema e todos os números marcados foram validados com sucesso.
+        <p className="text-xs text-zinc-400 mb-5 leading-relaxed">
+          Todos os números chamados foram verificados contra o registro auditado do sorteio.
         </p>
 
         {/* Actions */}
-        <div className="flex flex-col gap-2.5">
+        <div className="flex flex-col gap-2">
           {isHost ? (
             <button
               onClick={onRestartRound}
-              className="w-full py-3.5 px-4 rounded-xl font-bold text-xs uppercase tracking-wider text-zinc-950 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 transition-all flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25"
+              className="w-full py-2.5 px-4 rounded-md font-semibold text-xs tracking-wide text-zinc-950 bg-emerald-500 hover:bg-emerald-400 transition-colors flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
             >
-              <RotateCcw className="w-4 h-4" />
+              <RotateCcw className="w-3.5 h-3.5" />
               <span>Iniciar Nova Rodada</span>
             </button>
           ) : (
-            <div className="py-2.5 px-4 rounded-xl text-xs text-zinc-400 bg-zinc-900 border border-zinc-800">
-              Aguardando o anfitrião reiniciar a rodada...
+            <div className="py-2 px-3 rounded-md text-xs text-zinc-400 bg-zinc-900 border border-zinc-800">
+              Aguardando nova rodada do anfitrião...
             </div>
           )}
 
           <button
             onClick={onClose}
-            className="w-full py-2.5 text-xs text-zinc-400 hover:text-white transition-colors"
+            className="w-full py-2 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
           >
-            Ver Mesa de Jogo
+            Fechar e Ver Mesa
           </button>
         </div>
       </div>

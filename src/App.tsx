@@ -187,22 +187,22 @@ export default function App() {
     : MARKER_STYLES[0];
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans selection:bg-amber-400 selection:text-zinc-950">
+    <div className="min-h-screen bg-[#121316] text-zinc-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-zinc-950">
       {/* Toast Alert */}
       {toast && (
-        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 animate-bounce-subtle">
+        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
           <div
-            className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs font-semibold shadow-2xl border backdrop-blur-md ${
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-md text-xs font-medium shadow-md border backdrop-blur-sm ${
               toast.type === 'success'
-                ? 'bg-emerald-950/90 text-emerald-200 border-emerald-500/40 shadow-emerald-950/50'
+                ? 'bg-[#18191e] text-emerald-300 border-emerald-500/40'
                 : toast.type === 'error'
-                ? 'bg-red-950/90 text-red-200 border-red-500/40 shadow-red-950/50'
-                : 'bg-zinc-900/90 text-zinc-200 border-zinc-700 shadow-zinc-950/60'
+                ? 'bg-[#18191e] text-red-300 border-red-500/40'
+                : 'bg-[#18191e] text-zinc-200 border-zinc-700'
             }`}
           >
-            {toast.type === 'success' && <CheckCircle className="w-4 h-4 text-emerald-400" />}
-            {toast.type === 'error' && <AlertCircle className="w-4 h-4 text-red-400" />}
-            {toast.type === 'info' && <Info className="w-4 h-4 text-amber-400" />}
+            {toast.type === 'success' && <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />}
+            {toast.type === 'error' && <AlertCircle className="w-3.5 h-3.5 text-red-400" />}
+            {toast.type === 'info' && <Info className="w-3.5 h-3.5 text-zinc-400" />}
             <span>{toast.message}</span>
           </div>
         </div>
@@ -265,9 +265,9 @@ export default function App() {
             />
 
             {/* Split Arena: Bingo Card on Left / Chat on Right */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
               {/* Left 2 Cols: Player's Interactive Bingo Card */}
-              <div className="lg:col-span-2 bg-zinc-900/60 border border-zinc-800 rounded-3xl p-4 sm:p-6 shadow-2xl flex flex-col items-center">
+              <div className="lg:col-span-2 bg-[#18191e] border border-zinc-800 rounded-lg p-4 sm:p-6 shadow-sm flex flex-col items-center">
                 {currentPlayer && (
                   <BingoCardView
                     mode={room.mode}
@@ -285,7 +285,7 @@ export default function App() {
               </div>
 
               {/* Right 1 Col: Integrated Chat & Social Events */}
-              <div className="lg:col-span-1 h-[480px]">
+              <div className="lg:col-span-1 h-[460px]">
                 <ChatPanel
                   messages={room.chat}
                   currentPlayerId={currentPlayerId || ''}

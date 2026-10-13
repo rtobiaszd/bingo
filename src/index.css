@@ -2,44 +2,34 @@
 
 @layer base {
   body {
-    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-    background-color: #09090b;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    background-color: #121316;
     color: #f4f4f5;
     overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+    font-family: 'Poppins', 'Inter', sans-serif;
+    letter-spacing: -0.02em;
   }
 }
 
-@keyframes stamp {
+/* Subtle micro-interaction for marking cells (matte, solid, quick settle) */
+@keyframes cellMark {
   0% {
-    opacity: 0;
-    transform: scale(2) rotate(-25deg);
-  }
-  60% {
-    opacity: 1;
-    transform: scale(0.9) rotate(-8deg);
+    transform: scale(0.96);
   }
   100% {
-    transform: scale(1) rotate(0deg);
+    transform: scale(1);
   }
 }
 
-@keyframes bounceSubtle {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-4px);
-  }
-}
-
-@keyframes fadeIn {
+/* Smooth ball slide-in */
+@keyframes ballSlide {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
@@ -47,34 +37,44 @@
   }
 }
 
-.animate-stamp {
-  animation: stamp 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.animate-bounce-subtle {
-  animation: bounceSubtle 2.5s ease-in-out infinite;
+.animate-cell-mark {
+  animation: cellMark 0.12s ease-out forwards;
+}
+
+.animate-ball-slide {
+  animation: ballSlide 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .animate-fade-in {
-  animation: fadeIn 0.25s ease-out forwards;
+  animation: fadeIn 0.18s ease-out forwards;
 }
 
-/* Custom Scrollbars */
+/* Discreet scrollbar */
 .scrollbar-thin::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 .scrollbar-thin::-webkit-scrollbar-track {
-  background: rgba(24, 24, 27, 0.5);
-  border-radius: 9999px;
+  background: transparent;
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: rgba(63, 63, 70, 0.6);
-  border-radius: 9999px;
+  background: rgba(82, 82, 91, 0.4);
+  border-radius: 4px;
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: rgba(113, 113, 122, 0.8);
+  background: rgba(113, 113, 122, 0.6);
 }

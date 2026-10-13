@@ -37,109 +37,110 @@ export const WaitingRoomView: React.FC<WaitingRoomViewProps> = ({
   const playersList = Object.values(room.players);
 
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-6 animate-fade-in">
-      {/* Room Welcome Banner */}
-      <div className="bg-gradient-to-r from-zinc-900 via-zinc-900/90 to-zinc-950 border border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
+    <div className="w-full max-w-4xl mx-auto space-y-5 animate-fade-in">
+      {/* Room Welcome Header Card */}
+      <div className="bg-[#18191e] border border-zinc-800 rounded-lg p-5 sm:p-6 shadow-sm">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
           <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-xs font-bold text-amber-400 uppercase tracking-widest bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20">
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider">
                 Sala de Espera
               </span>
-              <span className="text-xs text-zinc-500 font-mono">
+              <span className="text-zinc-600">·</span>
+              <span className="text-xs text-zinc-400 font-mono">
                 {room.mode === 'BINGO_75' ? 'Bingo 75 Bolas' : 'Bingo 90 Bolas'}
               </span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-zinc-100 tracking-tight">
               {room.name}
             </h1>
-            <p className="text-xs sm:text-sm text-zinc-400 mt-1">
-              Compartilhe o código da sala com seus amigos para jogarem juntos em tempo real.
+            <p className="text-xs text-zinc-400 mt-1">
+              Compartilhe o código com os participantes para sincronizar o sorteio ao vivo.
             </p>
           </div>
 
-          {/* Room Code Card */}
-          <div className="bg-zinc-950/90 border border-zinc-800 p-4 rounded-2xl flex flex-col items-center gap-2 shrink-0 w-full sm:w-auto shadow-inner">
-            <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
-              Código da Sala
+          {/* Room Code Box */}
+          <div className="bg-[#202227] border border-zinc-800 p-3.5 rounded-lg flex flex-col items-center gap-1.5 shrink-0 w-full sm:w-auto">
+            <span className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
+              Código de Acesso
             </span>
             <div className="flex items-center gap-2">
-              <span className="font-mono text-3xl font-black text-amber-400 tracking-wider">
+              <span className="font-mono text-2xl font-bold text-zinc-100 tracking-widest tabular-nums">
                 {room.code}
               </span>
               <button
                 onClick={handleCopyCode}
-                className="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors"
+                className="p-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-colors cursor-pointer"
                 title="Copiar código"
               >
-                {copied ? <Check className="w-5 h-5 text-emerald-400" /> : <Copy className="w-5 h-5" />}
+                {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
               </button>
             </div>
             <button
               onClick={handleShareLink}
-              className="text-[11px] text-zinc-400 hover:text-amber-400 flex items-center gap-1 transition-colors"
+              className="text-[11px] text-zinc-400 hover:text-zinc-200 flex items-center gap-1 transition-colors cursor-pointer"
             >
               <Share2 className="w-3 h-3" />
-              <span>Copiar link da sala</span>
+              <span>Copiar link</span>
             </button>
           </div>
         </div>
       </div>
 
       {/* Grid: Players Roster & Action Card */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Players List (2 columns on wide) */}
-        <div className="lg:col-span-2 bg-zinc-900/80 border border-zinc-800 rounded-2xl p-5 shadow-xl">
-          <div className="flex items-center justify-between mb-4 pb-3 border-b border-zinc-800">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* Players List */}
+        <div className="lg:col-span-2 bg-[#18191e] border border-zinc-800 rounded-lg p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-3.5 pb-2.5 border-b border-zinc-800">
             <div className="flex items-center gap-2">
-              <Users className="w-4 h-4 text-amber-400" />
-              <h2 className="text-sm font-bold text-white uppercase tracking-wider">
-                Participantes Conectados ({playersList.length})
+              <Users className="w-4 h-4 text-zinc-400" />
+              <h2 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">
+                Participantes na Mesa ({playersList.length})
               </h2>
             </div>
             {isHost && (
               <button
                 onClick={onAddBots}
-                className="flex items-center gap-1.5 text-xs text-cyan-400 hover:text-cyan-300 bg-cyan-500/10 hover:bg-cyan-500/20 px-3 py-1.5 rounded-xl transition-colors font-medium"
+                className="flex items-center gap-1.5 text-xs text-zinc-300 hover:text-white bg-zinc-800 hover:bg-zinc-700 px-2.5 py-1 rounded-md transition-colors font-medium cursor-pointer"
               >
-                <UserPlus className="w-3.5 h-3.5" />
-                <span>+ Convidados Virtuais</span>
+                <UserPlus className="w-3.5 h-3.5 text-zinc-400" />
+                <span>+ Convidados</span>
               </button>
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             {playersList.map((player) => {
               const isMe = player.id === currentPlayerId;
               return (
                 <div
                   key={player.id}
-                  className={`p-3 rounded-xl border flex items-center justify-between transition-all ${
+                  className={`p-3 rounded-md border flex items-center justify-between transition-all ${
                     isMe
-                      ? 'bg-amber-500/10 border-amber-500/30'
-                      : 'bg-zinc-950/60 border-zinc-800/80'
+                      ? 'bg-zinc-800/60 border-zinc-700'
+                      : 'bg-[#202227] border-zinc-800/80'
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl" role="img" aria-label="avatar">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-xl" role="img" aria-label="avatar">
                       {player.avatar}
                     </span>
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-bold text-white">{player.name}</span>
+                        <span className="text-xs font-semibold text-zinc-200">{player.name}</span>
                         {isMe && (
-                          <span className="text-[10px] text-amber-400 font-bold">(Você)</span>
+                          <span className="text-[10px] text-emerald-400 font-medium">(Você)</span>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 text-[11px] text-zinc-400">
+                      <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
                         {player.isHost ? (
-                          <span className="flex items-center gap-1 text-amber-400">
-                            <Shield className="w-3 h-3" /> Anfitrião
+                          <span className="flex items-center gap-1 text-zinc-300">
+                            <Shield className="w-3 h-3 text-emerald-400" /> Anfitrião
                           </span>
                         ) : player.isBot ? (
-                          <span className="text-zinc-500">Convidado</span>
+                          <span>Convidado</span>
                         ) : (
-                          <span className="text-zinc-400">Jogador</span>
+                          <span>Jogador</span>
                         )}
                       </div>
                     </div>
@@ -150,44 +151,43 @@ export const WaitingRoomView: React.FC<WaitingRoomViewProps> = ({
           </div>
         </div>
 
-        {/* Room Launch & Customizer Box */}
-        <div className="bg-zinc-900/80 border border-zinc-800 rounded-2xl p-5 shadow-xl flex flex-col justify-between gap-5">
-          <div className="space-y-4">
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+        {/* Room Launch Card */}
+        <div className="bg-[#18191e] border border-zinc-800 rounded-lg p-5 shadow-sm flex flex-col justify-between gap-4">
+          <div className="space-y-3">
+            <h3 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider">
               Sua Cartela
             </h3>
             <p className="text-xs text-zinc-400 leading-relaxed">
-              Personalize o tema de cores, marcadores de pedras e gere novos números para sua cartela antes da partida começar!
+              Personalize cores e marcadores antes de iniciar o sorteio das pedras.
             </p>
 
             <button
               onClick={onOpenCustomizer}
-              className="w-full py-3 px-4 rounded-xl text-xs font-bold text-white bg-zinc-800 hover:bg-zinc-750 border border-zinc-700 transition-all flex items-center justify-center gap-2 shadow-sm"
+              className="w-full py-2.5 px-3 rounded-md text-xs font-semibold text-zinc-200 bg-[#202227] hover:bg-zinc-800 border border-zinc-750 transition-colors flex items-center justify-center gap-2 cursor-pointer"
             >
-              <Palette className="w-4 h-4 text-amber-400" />
-              <span>Personalizar Minha Cartela</span>
+              <Palette className="w-3.5 h-3.5 text-zinc-400" />
+              <span>Personalizar Cartela</span>
             </button>
           </div>
 
-          {/* Host Launch or Guest Waiting */}
-          <div className="pt-4 border-t border-zinc-800">
+          <div className="pt-3 border-t border-zinc-800">
             {isHost ? (
               <div className="space-y-2">
                 <button
                   onClick={onStartGame}
-                  className="w-full py-4 px-4 rounded-xl text-xs font-black uppercase tracking-wider text-zinc-950 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 hover:from-amber-300 hover:to-amber-500 transition-all flex items-center justify-center gap-2.5 shadow-xl shadow-amber-500/25 active:scale-95"
+                  className="w-full py-3 px-4 rounded-md text-xs font-bold uppercase tracking-wider text-zinc-950 bg-emerald-500 hover:bg-emerald-400 transition-colors flex items-center justify-center gap-2 shadow-sm cursor-pointer"
                 >
-                  <Play className="w-4 h-4 text-zinc-950" />
+                  <Play className="w-3.5 h-3.5 fill-current" />
                   <span>Iniciar Partida</span>
                 </button>
                 <p className="text-[11px] text-zinc-500 text-center">
-                  O sorteio começará automaticamente após o início.
+                  O sorteio começará em ritmo automático configurado.
                 </p>
               </div>
             ) : (
-              <div className="text-center p-3 rounded-xl bg-zinc-950 border border-zinc-800/80">
-                <p className="text-xs font-medium text-amber-400 animate-pulse">
-                  Aguardando o anfitrião iniciar a partida...
+              <div className="text-center p-3 rounded-md bg-[#202227] border border-zinc-800">
+                <p className="text-xs text-zinc-400">
+                  Aguardando anfitrião iniciar a partida...
                 </p>
               </div>
             )}
