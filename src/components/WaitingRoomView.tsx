@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { RoomState } from '../types/bingo';
-import { Copy, Check, Users, Play, Palette, UserPlus, Shield, Share2 } from 'lucide-react';
+import { Copy, Check, Users, Play, Palette, Shield, Share2 } from 'lucide-react';
 
 interface WaitingRoomViewProps {
   room: RoomState;
   currentPlayerId: string;
   isHost: boolean;
   onStartGame: () => void;
-  onAddBots: () => void;
   onOpenCustomizer: () => void;
 }
 
@@ -16,7 +15,6 @@ export const WaitingRoomView: React.FC<WaitingRoomViewProps> = ({
   currentPlayerId,
   isHost,
   onStartGame,
-  onAddBots,
   onOpenCustomizer,
 }) => {
   const [copied, setCopied] = useState(false);
@@ -98,15 +96,6 @@ export const WaitingRoomView: React.FC<WaitingRoomViewProps> = ({
                 Participantes na Mesa ({playersList.length})
               </h2>
             </div>
-            {isHost && (
-              <button
-                onClick={onAddBots}
-                className="flex items-center gap-1.5 text-xs text-zinc-300 hover:text-white bg-zinc-800 hover:bg-zinc-700 px-2.5 py-1 rounded-md transition-colors font-medium cursor-pointer"
-              >
-                <UserPlus className="w-3.5 h-3.5 text-zinc-400" />
-                <span>+ Convidados</span>
-              </button>
-            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -137,8 +126,6 @@ export const WaitingRoomView: React.FC<WaitingRoomViewProps> = ({
                           <span className="flex items-center gap-1 text-zinc-300">
                             <Shield className="w-3 h-3 text-emerald-400" /> Anfitrião
                           </span>
-                        ) : player.isBot ? (
-                          <span>Convidado</span>
                         ) : (
                           <span>Jogador</span>
                         )}

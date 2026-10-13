@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Pause, FastForward, Clock, RotateCcw, UserPlus } from 'lucide-react';
+import { Play, Pause, FastForward, Clock, RotateCcw } from 'lucide-react';
 import { RoomStatus } from '../types/bingo';
 
 interface HostControlsProps {
@@ -8,7 +8,6 @@ interface HostControlsProps {
   onTogglePause: () => void;
   onDrawNext: () => void;
   onSetSpeed: (sec: number) => void;
-  onAddBots: () => void;
   onRestartRound: () => void;
 }
 
@@ -18,7 +17,6 @@ export const HostControls: React.FC<HostControlsProps> = ({
   onTogglePause,
   onDrawNext,
   onSetSpeed,
-  onAddBots,
   onRestartRound,
 }) => {
   const isPlaying = status === 'PLAYING';
@@ -80,16 +78,6 @@ export const HostControls: React.FC<HostControlsProps> = ({
             </button>
           ))}
         </div>
-
-        {/* Add Bots */}
-        <button
-          onClick={onAddBots}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium bg-[#202227] border border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white transition-colors"
-          title="Adicionar jogadores convidados à mesa"
-        >
-          <UserPlus className="w-3.5 h-3.5 text-zinc-400" />
-          <span className="hidden sm:inline">+ Convidados</span>
-        </button>
 
         {/* Reset / New Round */}
         <button

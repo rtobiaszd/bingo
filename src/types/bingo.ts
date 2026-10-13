@@ -31,7 +31,6 @@ export interface PlayerProfile {
   name: string;
   avatar: string;
   isHost: boolean;
-  isBot?: boolean;
   themeId: string;
   markerId: string;
   cardNumbers: number[][]; // 5x5 (75) or 3x9 (90)

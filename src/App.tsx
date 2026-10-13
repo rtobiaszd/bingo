@@ -130,11 +130,6 @@ export default function App() {
     multiplayerService.setSpeed(seconds);
   };
 
-  const handleAddBots = () => {
-    multiplayerService.addPartyBots(3);
-    showToast('3 participantes virtuais entraram na mesa!', 'success');
-  };
-
   const handleRestartRound = () => {
     multiplayerService.restartRound();
     setIsWinnerDismissed(false);
@@ -233,7 +228,6 @@ export default function App() {
             currentPlayerId={currentPlayerId || ''}
             isHost={isHost}
             onStartGame={handleStartGame}
-            onAddBots={handleAddBots}
             onOpenCustomizer={() => setIsCustomizerOpen(true)}
           />
         ) : (
@@ -247,7 +241,6 @@ export default function App() {
                 onTogglePause={handleTogglePause}
                 onDrawNext={handleDrawNext}
                 onSetSpeed={handleSetSpeed}
-                onAddBots={handleAddBots}
                 onRestartRound={handleRestartRound}
               />
             )}

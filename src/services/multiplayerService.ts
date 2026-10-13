@@ -441,19 +441,6 @@ class MultiplayerService {
     room.currentBall = nextBall;
     room.drawnBalls.push(nextBall);
 
-    // Simulated bots auto-mark
-    Object.values(room.players).forEach((p) => {
-      if (p.isBot) {
-        p.cardNumbers.forEach((row, r) => {
-          row.forEach((val, c) => {
-            if (val === nextBall) {
-              p.markedCells[r][c] = true;
-            }
-          });
-        });
-      }
-    });
-
     // Sound and voice
     soundService.playBallDrawnSound();
     if (room.mode === 'BINGO_75') {
@@ -592,63 +579,6 @@ class MultiplayerService {
     this.saveAndBroadcast(room);
   }
 
-  // Add simulated party bot players
-  public addPartyBots(count: number = 3) {
-    if (!this.currentRoomId) return;
-    const room = this.getRoom(this.currentRoomId);
-    if (!room || !this.isCurrentPlayerHost(room)) return;
-
-    const botNames = [
-      { name: 'Neusa Silva', avatar: '☕', theme: 'nordico_claro' },
-      { name: 'Antonio M.', avatar: '👓', theme: 'grafite_menta' },
-      { name: 'Carlos Santos', avatar: '⚡', theme: 'grafite_laranja' },
-      { name: 'Beatriz Lima', avatar: '✦', theme: 'ardosia_cobalto' },
-      { name: 'Marcos R.', avatar: '🌿', theme: 'areia_carvao' },
-    ];
-
-    const currentNames = new Set(Object.values(room.players).map((p) => p.name));
-    const available = botNames.filter((b) => !currentNames.has(b.name));
-
-    for (let i = 0; i < Math.min(count, available.length); i++) {
-      const bot = available[i];
-      const botId = 'bot_' + Math.random().toString(36).substring(2, 7);
-      const card = room.mode === 'BINGO_75' ? generate75Card() : generate90Card();
-      const marked = card.map((row) => row.map(() => false));
-      if (room.mode === 'BINGO_75') marked[2][2] = true;
-
-      // If game already started, mark drawn balls
-      const drawnSet = new Set(room.drawnBalls);
-      card.forEach((row, r) => {
-        row.forEach((n, c) => {
-          if (n > 0 && drawnSet.has(n)) marked[r][c] = true;
-        });
-      });
-
-      room.players[botId] = {
-        id: botId,
-        name: bot.name,
-        avatar: bot.avatar,
-        isHost: false,
-        isBot: true,
-        themeId: bot.theme,
-        markerId: 'fill_solid',
-        cardNumbers: card,
-        markedCells: marked,
-        joinedAt: Date.now(),
-      };
-
-      room.chat.push({
-        id: 'sys_' + Date.now() + i,
-        senderId: 'system',
-        senderName: 'Sistema',
-        text: `${bot.avatar} ${bot.name} (Convidado) juntou-se à mesa!`,
-        timestamp: Date.now(),
-        isSystem: true,
-      });
-    }
-
-    this.saveAndBroadcast(room);
-  }
 
   // Restart / New Round
   public restartRound() {
