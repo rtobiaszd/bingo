@@ -1,0 +1,130 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User account registered with Google Auth",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "displayName": { "type": "string", "maxLength": 128 },
+        "photoURL": { "type": "string", "maxLength": 512 },
+        "isAdmin": { "type": "boolean" },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["uid", "email"]
+    },
+    "Room": {
+      "title": "Bingo Room",
+      "description": "Real-time Bingo game room state",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "code": { "type": "string", "maxLength": 10 },
+        "name": { "type": "string", "maxLength": 64 },
+        "hostId": { "type": "string", "maxLength": 128 },
+        "hostName": { "type": "string", "maxLength": 64 },
+        "hostAvatar": { "type": "string", "maxLength": 256 },
+        "hostEmail": { "type": "string", "maxLength": 256 },
+        "mode": { "type": "string", "enum": ["BINGO_75", "BINGO_90"] },
+        "status": { "type": "string", "enum": ["WAITING", "PLAYING", "PAUSED", "FINISHED"] },
+        "drawSpeedSeconds": { "type": "number" },
+        "winningRule": { "type": "string", "maxLength": 32 },
+        "drawnBalls": { "type": "array" },
+        "currentBall": { "type": "number" },
+        "isPrivate": { "type": "boolean" },
+        "maxPlayers": { "type": "number" },
+        "winnerId": { "type": "string", "maxLength": 128 },
+        "winnerName": { "type": "string", "maxLength": 64 },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "code", "name", "hostId", "mode", "status"]
+    },
+    "Participant": {
+      "title": "Room Participant",
+      "description": "Player joined in a specific bingo room",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 64 },
+        "avatar": { "type": "string", "maxLength": 256 },
+        "email": { "type": "string", "maxLength": 256 },
+        "isHost": { "type": "boolean" },
+        "isConnected": { "type": "boolean" },
+        "joinedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "name"]
+    },
+    "BingoCard": {
+      "title": "Player Bingo Card",
+      "description": "Bingo card assigned to a player in a room",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "roomId": { "type": "string", "maxLength": 128 },
+        "playerId": { "type": "string", "maxLength": 128 },
+        "playerName": { "type": "string", "maxLength": 64 },
+        "playerAvatar": { "type": "string", "maxLength": 256 },
+        "mode": { "type": "string", "enum": ["BINGO_75", "BINGO_90"] },
+        "numbers": { "type": "array" },
+        "markedNumbers": { "type": "array" },
+        "isWinner": { "type": "boolean" },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "roomId", "playerId", "numbers"]
+    },
+    "ChatMessage": {
+      "title": "Chat Message",
+      "description": "Message sent in a room chat",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "playerId": { "type": "string", "maxLength": 128 },
+        "senderName": { "type": "string", "maxLength": 64 },
+        "avatar": { "type": "string", "maxLength": 256 },
+        "text": { "type": "string", "maxLength": 500 },
+        "timestamp": { "type": "number" },
+        "type": { "type": "string", "enum": ["CHAT", "SYSTEM", "BINGO_CALL", "BALL_DRAWN", "ADMIN"] }
+      },
+      "required": ["id", "playerId", "senderName", "text", "timestamp"]
+    },
+    "Admin": {
+      "title": "Admin Record",
+      "description": "Trusted admin identifier record",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "role": { "type": "string", "maxLength": 32 }
+      },
+      "required": ["uid", "email"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Collection of registered user profiles"
+    },
+    "/rooms/{roomId}": {
+      "schema": "Room",
+      "description": "Active and finished bingo rooms"
+    },
+    "/rooms/{roomId}/participants/{participantId}": {
+      "schema": "Participant",
+      "description": "Players present in a room"
+    },
+    "/rooms/{roomId}/cards/{cardId}": {
+      "schema": "BingoCard",
+      "description": "Player bingo cards in the room"
+    },
+    "/rooms/{roomId}/messages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Chat and system announcement messages for the room"
+    },
+    "/admins/{adminId}": {
+      "schema": "Admin",
+      "description": "System admin documents"
+    }
+  }
+}

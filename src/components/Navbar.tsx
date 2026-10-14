@@ -1,6 +1,7 @@
 import React from 'react';
 import { Volume2, VolumeX, Mic, MicOff, Palette, Grid3X3, LogOut, Sparkles } from 'lucide-react';
 import { PWAInstallButton } from './PWAInstallButton';
+import { UserAuthButton } from './UserAuthButton';
 
 interface NavbarProps {
   roomCode?: string;
@@ -8,6 +9,7 @@ interface NavbarProps {
   onOpenCustomizer: () => void;
   onOpenBoard: () => void;
   onLeaveRoom?: () => void;
+  onOpenAdminDashboard?: () => void;
   sfxActive: boolean;
   speechActive: boolean;
   onToggleSfx: () => void;

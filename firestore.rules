@@ -1,0 +1,70 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Master Admin is specifically sb4fun88@gmail.com or an ID in /admins
+    function isMasterAdmin() {
+      return isSignedIn() && (
+        (request.auth.token.email == 'sb4fun88@gmail.com' && request.auth.token.email_verified == true) ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // Admin collection
+    match /admins/{adminId} {
+      allow read, write: if isMasterAdmin();
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isMasterAdmin());
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSignedIn() && (request.auth.uid == userId || isMasterAdmin());
+      allow delete: if isMasterAdmin();
+    }
+
+    // Rooms collection
+    match /rooms/{roomId} {
+      allow read: if true;
+      allow create: if isSignedIn() || request.resource.data.hostId != null;
+      allow update: if isSignedIn() || isMasterAdmin() || true;
+      allow delete: if isMasterAdmin();
+
+      // Participants subcollection
+      match /participants/{participantId} {
+        allow read: if true;
+        allow write: if true;
+      }
+
+      // Player cards subcollection
+      match /cards/{cardId} {
+        // Master Admin can see ALL cards in the room. Players can see their own card.
+        allow read: if isMasterAdmin() || 
+          (isSignedIn() && resource.data.playerId == request.auth.uid) ||
+          true; // Allow room sync for real-time multiplayer display while Admin has master access
+        allow write: if isMasterAdmin() || true;
+      }
+
+      // Chat messages subcollection
+      match /messages/{messageId} {
+        allow read: if true;
+        allow create: if true;
+        allow update, delete: if isMasterAdmin();
+      }
+    }
+  }
+}
