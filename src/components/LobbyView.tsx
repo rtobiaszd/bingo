@@ -1,8 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { BingoMode, WinningRule } from '../types/bingo';
+import React, { useState, useEffect, useMemo } from 'react';
+import { BingoMode, WinningRule, PublicRoomSummary } from '../types/bingo';
 import { AVATARS } from '../utils/themes';
-import { KeyRound, HelpCircle, ArrowRight, Dices, Sparkles, Loader2, Users } from 'lucide-react';
+import {
+  KeyRound,
+  HelpCircle,
+  Dices,
+  Sparkles,
+  Loader2,
+  Users,
+  Globe,
+  Lock,
+  RefreshCw,
+  Search,
+  Play,
+  ArrowRight,
+  ShieldCheck,
+  Zap,
+} from 'lucide-react';
 import { multiplayerService } from '../services/multiplayerService';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface LobbyViewProps {
   onCreateRoom: (
@@ -10,28 +26,45 @@ interface LobbyViewProps {
     avatar: string,
     mode: BingoMode,
     rule: WinningRule,
-    speed: number
+    speed: number,
+    isPrivate?: boolean,
+    roomName?: string
   ) => void;
   onJoinRoom: (code: string, playerName: string, avatar: string) => Promise<void> | void;
   initialCode?: string;
   isConnecting?: boolean;
 }
 
-export const LobbyView: React.FC<LobbyViewProps> = ({ onCreateRoom, onJoinRoom, initialCode }) => {
-  const [activeTab, setActiveTab] = useState<'create' | 'join' | 'rules'>(initialCode ? 'join' : 'create');
+export const LobbyView: React.FC<LobbyViewProps> = ({
+  onCreateRoom,
+  onJoinRoom,
+  initialCode,
+  isConnecting = false,
+}) => {
+  const [activeTab, setActiveTab] = useState<'openRooms' | 'create' | 'join' | 'rules'>(
+    initialCode ? 'join' : 'openRooms'
+  );
 
-  // Form states
+  // Profile states
   const [name, setName] = useState('Jogador da Sorte');
   const [avatar, setAvatar] = useState('👑');
+
+  // Create room states
+  const [customRoomName, setCustomRoomName] = useState('');
+  const [isPrivate, setIsPrivate] = useState(false); // default: false = Open Public Room
   const [mode, setMode] = useState<BingoMode>('BINGO_75');
   const [winningRule, setWinningRule] = useState<WinningRule>('ANY');
   const [speed, setSpeed] = useState<number>(4);
+
+  // Join room states
   const [joinCode, setJoinCode] = useState(initialCode || '');
+  const [searchFilter, setSearchFilter] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [availableRooms, setAvailableRooms] = useState<
-    { id: string; code: string; name: string; mode: string; playerCount: number; status: string }[]
-  >([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Open rooms list
+  const [openRooms, setOpenRooms] = useState<PublicRoomSummary[]>([]);
 
   useEffect(() => {
     if (initialCode) {
@@ -40,152 +73,217 @@ export const LobbyView: React.FC<LobbyViewProps> = ({ onCreateRoom, onJoinRoom, 
     }
   }, [initialCode]);
 
+  // Load and periodically refresh open rooms
+  const refreshRooms = async () => {
+    setIsRefreshing(true);
+    try {
+      const list = await multiplayerService.fetchOpenRooms();
+      setOpenRooms(list);
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 400);
+    }
+  };
+
   useEffect(() => {
-    const checkRooms = () => {
+    refreshRooms();
+    const interval = setInterval(() => {
       const list = multiplayerService.getAvailableLocalRooms();
-      setAvailableRooms(list);
-    };
-    checkRooms();
-    const interval = setInterval(checkRooms, 3000);
+      setOpenRooms(list);
+    }, 3000);
     return () => clearInterval(interval);
   }, []);
 
-  const handleCreate = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) {
-      setErrorMessage('Por favor, digite seu nome ou apelido.');
-      return;
-    }
-    onCreateRoom(name.trim(), avatar, mode, winningRule, speed);
-  };
+  // Filtered open rooms based on user search
+  const filteredRooms = useMemo(() => {
+    if (!searchFilter.trim()) return openRooms;
+    const q = searchFilter.toLowerCase();
+    return openRooms.filter(
+      (r) =>
+        r.name.toLowerCase().includes(q) ||
+        r.hostName.toLowerCase().includes(q) ||
+        r.code.toLowerCase().includes(q) ||
+        r.modeLabel.toLowerCase().includes(q)
+    );
+  }, [openRooms, searchFilter]);
 
-  const handleJoin = async (e: React.FormEvent) => {
+  const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       setErrorMessage('Por favor, informe seu nome ou apelido.');
       return;
     }
-    if (!joinCode.trim()) {
-      setErrorMessage('Digite o código de 6 dígitos da sala.');
+    setErrorMessage('');
+    onCreateRoom(
+      name.trim(),
+      avatar,
+      mode,
+      winningRule,
+      speed,
+      isPrivate,
+      customRoomName.trim() || undefined
+    );
+  };
+
+  const handleJoin = async (codeToJoin: string) => {
+    if (!name.trim()) {
+      setErrorMessage('Por favor, informe seu nome ou apelido.');
+      return;
+    }
+    const clean = codeToJoin.trim().toUpperCase();
+    if (!clean) {
+      setErrorMessage('Digite o código da sala.');
       return;
     }
     setErrorMessage('');
     setIsSubmitting(true);
     try {
-      await onJoinRoom(joinCode.trim(), name.trim(), avatar);
+      await onJoinRoom(clean, name.trim(), avatar);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="w-full max-w-3xl mx-auto space-y-7 animate-fade-in py-4">
+    <div className="w-full max-w-4xl mx-auto space-y-6 animate-fade-in py-2 px-3 sm:px-4">
       {/* Gamified Hero Banner */}
-      <div className="text-center space-y-3 relative">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-black uppercase tracking-widest font-display shadow-lg shadow-amber-500/10">
-          <Sparkles className="w-4 h-4 text-amber-400" />
+      <div className="text-center space-y-2.5 relative">
+        <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-amber-500/20 border border-amber-400/40 text-amber-300 text-[11px] sm:text-xs font-black uppercase tracking-widest font-display shadow-lg shadow-amber-500/10">
+          <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin-slow" />
           <span>Multiplayer em Tempo Real</span>
         </div>
-        <h1 className="text-3xl sm:text-5xl md:text-6xl font-black text-white font-display tracking-tight drop-shadow-lg">
-          BINGO <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-500">CLUB</span>
+        <h1 className="text-3xl sm:text-5xl md:text-6xl font-black text-white font-display tracking-tight drop-shadow-xl">
+          BINGO <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-orange-500 to-amber-300">CLUB</span>
         </h1>
-        <p className="text-slate-300 text-xs sm:text-sm max-w-md mx-auto leading-relaxed font-display">
-          Salas privadas para jogar com amigos em qualquer dispositivo, globo automático sincronizado e cartelas personalizadas.
+        <p className="text-slate-300 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed font-display">
+          Mesas abertas com contagem de jogadores em tempo real, sorteio sincronizado com voz narradora e suporte PWA para celular e computador.
         </p>
       </div>
 
       {/* Gamified Segmented Control Navigation */}
       <div className="flex items-center justify-center">
-        <div className="bg-slate-900/80 backdrop-blur-xl border border-white/10 p-1.5 rounded-2xl flex gap-1.5 shadow-xl">
+        <div className="bg-slate-900/90 backdrop-blur-2xl border border-white/10 p-1 rounded-2xl flex flex-wrap justify-center gap-1 shadow-2xl w-full sm:w-auto">
+          {/* Tab 1: Salas Abertas (Públicas) */}
+          <button
+            onClick={() => {
+              setActiveTab('openRooms');
+              setErrorMessage('');
+              refreshRooms();
+            }}
+            className={`flex items-center gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-[11px] sm:text-xs font-black uppercase tracking-wider font-display transition-all cursor-pointer flex-1 sm:flex-initial justify-center ${
+              activeTab === 'openRooms'
+                ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 shadow-md shadow-amber-500/30'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Globe className="w-4 h-4 shrink-0" />
+            <span>Salas Abertas</span>
+            <span
+              className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                activeTab === 'openRooms'
+                  ? 'bg-slate-950/20 text-slate-950'
+                  : 'bg-amber-400/20 text-amber-300 border border-amber-400/30'
+              }`}
+            >
+              {openRooms.length}
+            </span>
+          </button>
+
+          {/* Tab 2: Criar Sala */}
           <button
             onClick={() => {
               setActiveTab('create');
               setErrorMessage('');
             }}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider font-display transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-[11px] sm:text-xs font-black uppercase tracking-wider font-display transition-all cursor-pointer flex-1 sm:flex-initial justify-center ${
               activeTab === 'create'
                 ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 shadow-md shadow-amber-500/30'
-                : 'text-slate-400 hover:text-white'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
             }`}
           >
-            <Dices className="w-4 h-4" />
+            <Dices className="w-4 h-4 shrink-0" />
             <span>Criar Sala</span>
           </button>
 
+          {/* Tab 3: Entrar com Código Privado */}
           <button
             onClick={() => {
               setActiveTab('join');
               setErrorMessage('');
             }}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider font-display transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-[11px] sm:text-xs font-black uppercase tracking-wider font-display transition-all cursor-pointer flex-1 sm:flex-initial justify-center ${
               activeTab === 'join'
                 ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 shadow-md shadow-amber-500/30'
-                : 'text-slate-400 hover:text-white'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
             }`}
           >
-            <KeyRound className="w-4 h-4" />
+            <KeyRound className="w-4 h-4 shrink-0" />
             <span>Entrar com Código</span>
           </button>
 
+          {/* Tab 4: Regras */}
           <button
-            onClick={() => setActiveTab('rules')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider font-display transition-all cursor-pointer ${
+            onClick={() => {
+              setActiveTab('rules');
+              setErrorMessage('');
+            }}
+            className={`flex items-center gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-[11px] sm:text-xs font-black uppercase tracking-wider font-display transition-all cursor-pointer flex-1 sm:flex-initial justify-center ${
               activeTab === 'rules'
                 ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 shadow-md shadow-amber-500/30'
-                : 'text-slate-400 hover:text-white'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
             }`}
           >
-            <HelpCircle className="w-4 h-4" />
-            <span>Regras</span>
+            <HelpCircle className="w-4 h-4 shrink-0" />
+            <span className="hidden sm:inline">Regras</span>
           </button>
         </div>
       </div>
 
       {/* Error notification banner */}
       {errorMessage && (
-        <div className="bg-rose-500/20 border border-rose-500/40 text-rose-200 text-xs py-2.5 px-4 rounded-2xl text-center max-w-md mx-auto shadow-lg font-display">
+        <div className="bg-rose-500/20 border border-rose-500/40 text-rose-200 text-xs py-2.5 px-4 rounded-2xl text-center max-w-md mx-auto shadow-lg font-display animate-fade-in">
           {errorMessage}
         </div>
       )}
 
-      {/* Tab 1: Create Room */}
-      {activeTab === 'create' && (
-        <form
-          onSubmit={handleCreate}
-          className="bg-slate-900/60 backdrop-blur-2xl border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl max-w-xl mx-auto space-y-6"
-        >
-          {/* Player Identity */}
-          <div className="space-y-3">
-            <label className="text-xs font-black text-amber-300 uppercase tracking-widest font-display block">
-              Seu Perfil
-            </label>
-            <div className="flex gap-3 items-center">
-              <div className="w-13 h-13 rounded-2xl bg-gradient-to-tr from-amber-400 to-orange-500 p-0.5 flex items-center justify-center text-3xl shadow-lg shrink-0">
-                <div className="w-full h-full bg-slate-900 rounded-[14px] flex items-center justify-center">
-                  {avatar}
-                </div>
-              </div>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Seu nome no jogo"
-                maxLength={24}
-                className="flex-1 bg-white/[0.06] border border-white/10 rounded-2xl px-4 py-3 text-sm text-white placeholder-slate-400 font-display focus:outline-none focus:border-amber-400 focus:bg-white/[0.1] transition-all shadow-inner"
-              />
+      {/* Global Profile Bar (Shared across tabs for quick setup) */}
+      <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-3 sm:p-4 max-w-xl mx-auto shadow-lg flex flex-col sm:flex-row items-center gap-3">
+        <div className="flex items-center gap-2.5 w-full sm:w-auto shrink-0">
+          <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-amber-400 to-orange-500 p-0.5 flex items-center justify-center text-2xl shadow-md shrink-0">
+            <div className="w-full h-full bg-slate-900 rounded-[10px] flex items-center justify-center">
+              {avatar}
             </div>
+          </div>
+          <div className="flex-1 sm:hidden">
+            <span className="text-[10px] uppercase font-black text-amber-300 font-display block">Seu Nick</span>
+            <span className="text-xs font-bold text-white font-display truncate block">{name || 'Sem nome'}</span>
+          </div>
+        </div>
 
-            {/* Quick avatar selection */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-1">
-              {AVATARS.map((av) => (
+        <div className="flex-1 w-full space-y-1">
+          <div className="flex items-center justify-between text-[11px] font-bold text-slate-300 font-display">
+            <span>Seu Nome no Jogo</span>
+            <span className="text-slate-400 text-[10px]">Escolha seu avatar ao lado</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Ex: Campeão 77"
+              maxLength={24}
+              className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 font-display focus:outline-none focus:border-amber-400 focus:bg-white/[0.08] transition-all"
+            />
+            {/* Quick avatar popover selector */}
+            <div className="flex items-center gap-1 shrink-0">
+              {AVATARS.slice(0, 5).map((av) => (
                 <button
                   key={av}
                   type="button"
                   onClick={() => setAvatar(av)}
-                  className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg transition-transform cursor-pointer ${
+                  className={`w-7 h-7 rounded-lg text-sm flex items-center justify-center transition-transform cursor-pointer ${
                     avatar === av
-                      ? 'bg-amber-400/20 border-2 border-amber-400 scale-110 shadow-md'
-                      : 'bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 border border-white/10'
+                      ? 'bg-amber-400/20 border-2 border-amber-400 scale-110 shadow-sm'
+                      : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10'
                   }`}
                 >
                   {av}
@@ -193,175 +291,428 @@ export const LobbyView: React.FC<LobbyViewProps> = ({ onCreateRoom, onJoinRoom, 
               ))}
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* TAB 1: SALAS ABERTAS (PÚBLICAS) COM CONTAGEM DE JOGADORES                 */}
+      {/* ========================================================================= */}
+      {activeTab === 'openRooms' && (
+        <div className="space-y-4 max-w-4xl mx-auto">
+          {/* Top Bar with Filter & Refresh */}
+          <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-3 sm:p-4 shadow-xl flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-400 to-orange-500 text-slate-950 flex items-center justify-center font-black">
+                <Globe className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-white font-display">Salas Criadas Abertas</h3>
+                <p className="text-[11px] text-slate-400 font-display">
+                  Salas públicas da comunidade. Escolha uma mesa e entre direto com 1 clique!
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1 sm:w-56">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={searchFilter}
+                  onChange={(e) => setSearchFilter(e.target.value)}
+                  placeholder="Buscar mesa ou host..."
+                  className="w-full bg-black/40 border border-white/10 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 font-display focus:outline-none focus:border-amber-400 transition-all"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={refreshRooms}
+                disabled={isRefreshing}
+                title="Atualizar lista de salas"
+                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition-all cursor-pointer active:scale-95 shrink-0"
+              >
+                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-amber-400' : ''}`} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPrivate(false);
+                  setActiveTab('create');
+                }}
+                className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 text-slate-950 text-xs font-black uppercase font-display tracking-wider transition-all shadow-md active:scale-95 cursor-pointer shrink-0 hidden sm:flex items-center gap-1.5"
+              >
+                <Dices className="w-3.5 h-3.5" />
+                <span>Abrir Sala</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Grid of Open Rooms */}
+          {filteredRooms.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+              {filteredRooms.map((room) => {
+                const isPlaying = room.status === 'PLAYING';
+                return (
+                  <div
+                    key={room.code}
+                    className="group bg-slate-900/80 hover:bg-slate-900/95 backdrop-blur-xl border border-white/10 hover:border-amber-400/50 rounded-2xl p-4 shadow-xl hover:shadow-amber-500/10 transition-all flex flex-col justify-between gap-3 relative overflow-hidden"
+                  >
+                    {/* Top ambient highlight line */}
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400/50 via-orange-500/50 to-amber-400/0 opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                    <div>
+                      {/* Header row: Room name + Status pill */}
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="min-w-0 flex-1">
+                          <h4 className="text-sm font-black text-white font-display truncate group-hover:text-amber-300 transition-colors">
+                            {room.name}
+                          </h4>
+                          <div className="flex items-center gap-1.5 text-xs text-slate-300 font-display mt-0.5">
+                            <span className="text-base">{room.hostAvatar || '👑'}</span>
+                            <span className="truncate">Host: <strong>{room.hostName}</strong></span>
+                          </div>
+                        </div>
+
+                        {/* Status Badge */}
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase font-display tracking-wider shrink-0 ${
+                            isPlaying
+                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                              : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                          }`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              isPlaying ? 'bg-amber-400 animate-ping' : 'bg-emerald-400'
+                            }`}
+                          />
+                          {isPlaying ? 'Em Jogo' : 'Aguardando'}
+                        </span>
+                      </div>
+
+                      {/* Room Stats Pill Chips */}
+                      <div className="flex flex-wrap gap-1.5 text-[11px] font-display mb-2">
+                        {/* Number of players badge - highlighted */}
+                        <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 font-bold">
+                          <Users className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>
+                            {room.playerCount} {room.playerCount === 1 ? 'Jogador' : 'Jogadores'}
+                          </span>
+                        </div>
+
+                        {/* Mode badge */}
+                        <div className="flex items-center gap-1 px-2 py-1 rounded-xl bg-white/5 border border-white/10 text-slate-300 font-semibold">
+                          <Dices className="w-3 h-3 text-amber-400" />
+                          <span>{room.modeLabel}</span>
+                        </div>
+
+                        {/* Speed badge */}
+                        <div className="flex items-center gap-1 px-2 py-1 rounded-xl bg-white/5 border border-white/10 text-slate-300 font-semibold">
+                          <Zap className="w-3 h-3 text-emerald-400" />
+                          <span>{room.drawSpeedSeconds}s/bola</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Footer Row: Code info & Direct Join Button */}
+                    <div className="flex items-center justify-between pt-2.5 border-t border-white/10 gap-2">
+                      <div className="text-[11px] font-mono text-slate-400">
+                        Código: <span className="font-bold text-amber-300">{room.code}</span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleJoin(room.code)}
+                        disabled={isSubmitting}
+                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400 hover:from-amber-300 hover:to-orange-400 text-slate-950 text-xs font-black uppercase font-display tracking-wider transition-all shadow-md shadow-amber-500/20 active:scale-95 cursor-pointer flex items-center gap-1.5"
+                      >
+                        <Play className="w-3.5 h-3.5 fill-current" />
+                        <span>Entrar na Sala</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* Empty State for Open Rooms */
+            <div className="bg-slate-900/60 backdrop-blur-2xl border border-white/10 rounded-3xl p-8 sm:p-12 text-center space-y-4 max-w-xl mx-auto shadow-2xl">
+              <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-amber-400/20 to-orange-500/20 border border-amber-400/40 text-amber-400 flex items-center justify-center mx-auto text-3xl shadow-lg">
+                <Globe className="w-8 h-8" />
+              </div>
+              <div className="space-y-1.5">
+                <h3 className="text-lg font-black text-white font-display">
+                  Nenhuma Sala Pública Aberta no Momento
+                </h3>
+                <p className="text-xs text-slate-400 font-display max-w-md mx-auto leading-relaxed">
+                  As salas privadas ficam ocultas com código. Seja o primeiro a criar uma mesa pública e aberta para que outros jogadores possam entrar e disputar o Bingo!
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPrivate(false);
+                  setActiveTab('create');
+                }}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 text-slate-950 font-black text-xs uppercase font-display tracking-widest transition-all shadow-xl shadow-amber-500/20 cursor-pointer active:scale-95"
+              >
+                <Dices className="w-4 h-4" />
+                <span>Criar a Primeira Sala Pública</span>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 2: CRIAR SALA (COM SELETOR: ABERTA / PÚBLICA vs PRIVADA COM CÓDIGO)   */}
+      {/* ========================================================================= */}
+      {activeTab === 'create' && (
+        <form
+          onSubmit={handleCreate}
+          className="bg-slate-900/70 backdrop-blur-2xl border border-white/10 rounded-3xl p-5 sm:p-8 shadow-2xl max-w-xl mx-auto space-y-5"
+        >
+          <div className="flex items-center gap-2.5 pb-3 border-b border-white/10">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+              <Dices className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-black text-white uppercase tracking-wider font-display">
+                Configurar Nova Mesa
+              </h2>
+              <p className="text-[11px] text-slate-400 font-display">
+                Defina o tipo da sala, regras e velocidade do sorteio
+              </p>
+            </div>
+          </div>
+
+          {/* Room Name (Optional) */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-black text-amber-300 uppercase tracking-widest font-display block">
+              Nome da Sala (Opcional)
+            </label>
+            <input
+              type="text"
+              value={customRoomName}
+              onChange={(e) => setCustomRoomName(e.target.value)}
+              placeholder={`Ex: Mesa do ${name || 'Campeão'}`}
+              maxLength={30}
+              className="w-full bg-white/[0.06] border border-white/10 rounded-2xl px-4 py-2.5 text-xs sm:text-sm text-white placeholder-slate-500 font-display focus:outline-none focus:border-amber-400 transition-all"
+            />
+          </div>
+
+          {/* Privacy Type Selector: Aberta vs Privada */}
+          <div className="space-y-2">
+            <label className="text-xs font-black text-amber-300 uppercase tracking-widest font-display block">
+              Privacidade da Sala
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {/* Option 1: Aberta / Pública */}
+              <button
+                type="button"
+                onClick={() => setIsPrivate(false)}
+                className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex items-start gap-3 ${
+                  !isPrivate
+                    ? 'bg-gradient-to-br from-emerald-500/20 to-teal-500/10 border-emerald-400/60 shadow-lg shadow-emerald-500/10'
+                    : 'bg-white/[0.04] border-white/10 hover:bg-white/[0.08]'
+                }`}
+              >
+                <div
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+                    !isPrivate
+                      ? 'bg-emerald-400 text-slate-950'
+                      : 'bg-white/10 text-slate-400'
+                  }`}
+                >
+                  <Globe className="w-4 h-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-black text-white font-display">Sala Aberta (Pública)</span>
+                    <span className="px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 text-[9px] font-bold uppercase">
+                      Recomendado
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 font-display mt-0.5 leading-tight">
+                    Visível na lista para qualquer jogador entrar direto e ver o número de participantes.
+                  </p>
+                </div>
+              </button>
+
+              {/* Option 2: Privada com Código */}
+              <button
+                type="button"
+                onClick={() => setIsPrivate(true)}
+                className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex items-start gap-3 ${
+                  isPrivate
+                    ? 'bg-gradient-to-br from-amber-500/20 to-orange-500/10 border-amber-400/60 shadow-lg shadow-amber-500/10'
+                    : 'bg-white/[0.04] border-white/10 hover:bg-white/[0.08]'
+                }`}
+              >
+                <div
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+                    isPrivate
+                      ? 'bg-amber-400 text-slate-950'
+                      : 'bg-white/10 text-slate-400'
+                  }`}
+                >
+                  <Lock className="w-4 h-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-xs font-black text-white font-display block">Sala Privada (Código)</span>
+                  <p className="text-[11px] text-slate-400 font-display mt-0.5 leading-tight">
+                    Oculta da lista pública. Só entra quem receber o código secreto de 6 dígitos.
+                  </p>
+                </div>
+              </button>
+            </div>
+          </div>
 
           {/* Bingo Mode Selector */}
-          <div className="space-y-2.5">
+          <div className="space-y-2">
             <label className="text-xs font-black text-amber-300 uppercase tracking-widest font-display block">
-              Modalidade da Partida
+              Modalidade
             </label>
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
                 onClick={() => setMode('BINGO_75')}
-                className={`p-4 rounded-2xl border text-left transition-all duration-300 cursor-pointer ${
+                className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
                   mode === 'BINGO_75'
-                    ? 'border-cyan-400 bg-cyan-500/15 shadow-[0_0_25px_rgba(6,182,212,0.2)] ring-1 ring-cyan-400'
-                    : 'border-white/10 bg-white/[0.04] hover:border-white/20'
+                    ? 'bg-amber-400/20 border-amber-400 text-white shadow-lg shadow-amber-500/10'
+                    : 'bg-white/[0.04] border-white/10 hover:bg-white/[0.08] text-slate-300'
                 }`}
               >
-                <div className="font-black text-sm text-white font-display">Bingo 75 Bolas</div>
-                <div className="text-xs text-slate-300 mt-1 leading-snug">
-                  Grade 5x5 tradicional com centro livre e padrões de linha ou diagonal.
+                <div className="font-black text-sm font-display flex items-center justify-between">
+                  <span>Bingo 75</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300">
+                    5x5
+                  </span>
                 </div>
+                <p className="text-[11px] text-slate-400 mt-1 font-display">
+                  Cartela clássica americana com B-I-N-G-O e espaço central livre.
+                </p>
               </button>
 
               <button
                 type="button"
                 onClick={() => setMode('BINGO_90')}
-                className={`p-4 rounded-2xl border text-left transition-all duration-300 cursor-pointer ${
+                className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
                   mode === 'BINGO_90'
-                    ? 'border-cyan-400 bg-cyan-500/15 shadow-[0_0_25px_rgba(6,182,212,0.2)] ring-1 ring-cyan-400'
-                    : 'border-white/10 bg-white/[0.04] hover:border-white/20'
+                    ? 'bg-amber-400/20 border-amber-400 text-white shadow-lg shadow-amber-500/10'
+                    : 'bg-white/[0.04] border-white/10 hover:bg-white/[0.08] text-slate-300'
                 }`}
               >
-                <div className="font-black text-sm text-white font-display">Bingo 90 Bolas</div>
-                <div className="text-xs text-slate-300 mt-1 leading-snug">
-                  Cartela 3x9 tradicional com 15 números por cartela e prêmio por linha.
+                <div className="font-black text-sm font-display flex items-center justify-between">
+                  <span>Bingo 90</span>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-300">
+                    3x9
+                  </span>
                 </div>
+                <p className="text-[11px] text-slate-400 mt-1 font-display">
+                  Estilo europeu e brasileiro com 3 linhas de 5 números cada.
+                </p>
               </button>
             </div>
           </div>
 
           {/* Winning Rule */}
-          <div className="space-y-2.5">
+          <div className="space-y-2">
             <label className="text-xs font-black text-amber-300 uppercase tracking-widest font-display block">
-              Padrão para Gritar Bingo
+              Padrão Vencedor
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {[
-                { id: 'ANY', label: 'Qualquer Padrão' },
-                { id: 'FULL_CARD', label: 'Cartela Cheia' },
-                { id: 'LINE', label: 'Linha' },
-                { id: 'CORNERS', label: '4 Cantos' },
-              ].map((opt) => (
+                { id: 'ANY', label: 'Qualquer Linha / Cheia', desc: 'Primeiro a fechar linha ou cartela' },
+                { id: 'FULL_CARD', label: 'Cartela Cheia', desc: 'Ganha quem marcar todos os números' },
+                { id: 'LINE', label: 'Linha Simples', desc: 'Linha horizontal ou vertical completa' },
+                { id: 'CORNERS', label: 'Quatro Cantos', desc: 'Os 4 vértices extremos da cartela' },
+              ].map((r) => (
                 <button
-                  key={opt.id}
+                  key={r.id}
                   type="button"
-                  onClick={() => setWinningRule(opt.id as WinningRule)}
-                  className={`py-2.5 px-2 rounded-xl border text-xs font-bold transition-all text-center cursor-pointer font-display ${
-                    winningRule === opt.id
-                      ? 'border-amber-400 bg-amber-400/20 text-amber-300 shadow-md shadow-amber-500/10'
-                      : 'border-white/10 bg-white/[0.04] text-slate-400 hover:border-white/20'
+                  onClick={() => setWinningRule(r.id as WinningRule)}
+                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                    winningRule === r.id
+                      ? 'bg-amber-400/20 border-amber-400 text-white'
+                      : 'bg-white/[0.04] border-white/10 hover:bg-white/[0.08] text-slate-300'
                   }`}
                 >
-                  {opt.label}
+                  <div className="font-bold text-xs font-display">{r.label}</div>
+                  <div className="text-[10px] text-slate-400 mt-0.5 truncate font-display">{r.desc}</div>
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Draw Speed */}
+          {/* Ball Spinner Speed */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-xs font-black text-amber-300 uppercase tracking-widest font-display">
                 Velocidade do Sorteio
               </label>
-              <span className="font-game text-sm text-amber-400 font-bold">{speed}s por pedra</span>
+              <span className="text-xs font-bold text-amber-400 font-display">
+                {speed} segundos por bola
+              </span>
             </div>
-            <div className="flex gap-2">
-              {[3, 4, 6, 8].map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setSpeed(s)}
-                  className={`flex-1 py-2.5 rounded-xl text-xs font-game font-bold border transition-all cursor-pointer ${
-                    speed === s
-                      ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-md shadow-amber-500/20'
-                      : 'bg-white/[0.04] border-white/10 text-slate-400 hover:border-white/20'
-                  }`}
-                >
-                  {s}s
-                </button>
-              ))}
+            <input
+              type="range"
+              min={3}
+              max={10}
+              step={1}
+              value={speed}
+              onChange={(e) => setSpeed(Number(e.target.value))}
+              className="w-full accent-amber-400 cursor-pointer h-2 bg-slate-800 rounded-lg"
+            />
+            <div className="flex justify-between text-[10px] text-slate-400 font-display">
+              <span>Rápido (3s)</span>
+              <span>Padrão (4-5s)</span>
+              <span>Tranquilo (10s)</span>
             </div>
           </div>
 
-          {/* Submit */}
+          {/* Submit Button */}
           <button
             type="submit"
-            className="w-full py-4 rounded-2xl text-xs font-black uppercase tracking-widest font-display text-slate-950 bg-gradient-to-r from-amber-400 via-orange-500 to-amber-500 hover:from-amber-300 hover:to-orange-400 transition-all duration-300 flex items-center justify-center gap-2 shadow-xl shadow-amber-500/30 cursor-pointer active:scale-95 border-2 border-amber-300"
+            className="w-full py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest font-display text-slate-950 bg-gradient-to-r from-amber-400 via-orange-500 to-amber-500 hover:from-amber-300 hover:to-orange-400 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 shadow-xl shadow-amber-500/25 border-2 border-amber-300"
           >
-            <span>CRIAR SALA PRIVADA</span>
-            <ArrowRight className="w-4 h-4 stroke-[3]" />
+            <Dices className="w-4 h-4 stroke-[2.5]" />
+            <span>{isPrivate ? 'CRIAR SALA PRIVADA' : 'CRIAR SALA PÚBLICA ABERTA'}</span>
           </button>
         </form>
       )}
 
-      {/* Tab 2: Join Room with Code */}
+      {/* ========================================================================= */}
+      {/* TAB 3: ENTRAR COM CÓDIGO (SALAS PRIVADAS)                                 */}
+      {/* ========================================================================= */}
       {activeTab === 'join' && (
         <form
-          onSubmit={handleJoin}
-          className="bg-slate-900/60 backdrop-blur-2xl border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl max-w-md mx-auto space-y-5"
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleJoin(joinCode);
+          }}
+          className="bg-slate-900/70 backdrop-blur-2xl border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl max-w-xl mx-auto space-y-6"
         >
-          <div className="space-y-2">
-            <label className="text-xs font-black text-amber-300 uppercase tracking-widest font-display block">
-              Seu Nome de Jogador
-            </label>
-            <div className="flex gap-2.5 items-center">
-              <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-400 to-orange-500 p-0.5 flex items-center justify-center text-2xl shrink-0">
-                <div className="w-full h-full bg-slate-900 rounded-[14px] flex items-center justify-center">
-                  {avatar}
-                </div>
-              </div>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Seu apelido"
-                maxLength={24}
-                className="flex-1 bg-white/[0.06] border border-white/10 rounded-2xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-amber-400 transition-all font-display"
-              />
+          <div className="flex items-center gap-2.5 pb-3 border-b border-white/10">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+              <KeyRound className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-black text-white uppercase tracking-wider font-display">
+                Acessar Sala com Código
+              </h2>
+              <p className="text-[11px] text-slate-400 font-display">
+                Digite o código de 6 dígitos recebido do anfitrião
+              </p>
             </div>
           </div>
 
-          {/* Quick Connect: Local active rooms */}
-          {availableRooms.length > 0 && (
-            <div className="space-y-2 p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/10 via-cyan-500/10 to-amber-500/10 border border-amber-400/30">
-              <span className="text-[11px] font-black text-amber-300 uppercase tracking-widest font-display flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>Mesas Ativas Encontradas ({availableRooms.length})</span>
-              </span>
-              <div className="space-y-1.5 max-h-36 overflow-y-auto scrollbar-thin">
-                {availableRooms.map((r) => (
-                  <div
-                    key={r.id}
-                    className="p-2.5 rounded-xl bg-black/40 border border-white/10 hover:border-amber-400/50 flex items-center justify-between gap-2 transition-all"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="text-xs font-bold text-white font-display truncate">{r.name}</div>
-                      <div className="text-[10px] text-slate-400 font-mono">
-                        Código: <span className="text-amber-300 font-bold">{r.code}</span> · {r.mode}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setJoinCode(r.code);
-                        onJoinRoom(r.code, name.trim() || 'Jogador', avatar);
-                      }}
-                      className="px-3 py-1 rounded-lg bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 text-slate-950 text-[11px] font-black font-display uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer shrink-0"
-                    >
-                      Entrar
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           <div className="space-y-2">
-            <label className="text-xs font-black text-amber-300 uppercase tracking-widest font-display block">
-              Código de Acesso da Sala
+            <label className="text-xs font-black text-amber-300 uppercase tracking-widest font-display block text-center">
+              Código de Acesso
             </label>
             <input
               type="text"
@@ -369,11 +720,8 @@ export const LobbyView: React.FC<LobbyViewProps> = ({ onCreateRoom, onJoinRoom, 
               onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
               placeholder="Ex: 584920"
               maxLength={12}
-              className="w-full bg-black/40 border border-amber-400/40 rounded-2xl px-4 py-3 text-center text-2xl font-game font-bold tracking-widest text-amber-300 focus:outline-none focus:border-amber-400 focus:shadow-[0_0_20px_rgba(245,158,11,0.3)] transition-all uppercase tabular-nums"
+              className="w-full bg-black/40 border-2 border-amber-400/40 rounded-2xl px-4 py-3.5 text-center text-2xl sm:text-3xl font-game font-bold tracking-widest text-amber-300 focus:outline-none focus:border-amber-400 focus:shadow-[0_0_20px_rgba(245,158,11,0.3)] transition-all uppercase tabular-nums"
             />
-            <p className="text-[11px] text-slate-400 text-center font-display">
-              Insira o código de 6 dígitos compartilhado pelo anfitrião.
-            </p>
           </div>
 
           <button
@@ -396,47 +744,68 @@ export const LobbyView: React.FC<LobbyViewProps> = ({ onCreateRoom, onJoinRoom, 
         </form>
       )}
 
-      {/* Tab 3: Rules & Guidance */}
+      {/* ========================================================================= */}
+      {/* TAB 4: REGRAS                                                             */}
+      {/* ========================================================================= */}
       {activeTab === 'rules' && (
-        <div className="bg-slate-900/60 backdrop-blur-2xl border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl max-w-xl mx-auto space-y-5 text-slate-200">
+        <div className="bg-slate-900/70 backdrop-blur-2xl border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl max-w-xl mx-auto space-y-5 text-slate-200">
           <div className="flex items-center gap-2.5 pb-3 border-b border-white/10">
-            <div className="w-7 h-7 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
               <HelpCircle className="w-4 h-4" />
             </div>
-            <h2 className="text-sm font-black text-white uppercase tracking-wider font-display">Regras de Jogo</h2>
+            <div>
+              <h2 className="text-sm font-black text-white uppercase tracking-wider font-display">
+                Regras e Como Jogar
+              </h2>
+              <p className="text-[11px] text-slate-400 font-display">
+                Instruções para partidas em grupo
+              </p>
+            </div>
           </div>
 
           <div className="space-y-4 text-xs leading-relaxed text-slate-300 font-display">
-            <div>
-              <h3 className="font-bold text-amber-300 text-sm mb-0.5">1. Sincronização em Tempo Real</h3>
+            <div className="bg-white/5 p-3.5 rounded-2xl border border-white/5">
+              <h3 className="font-bold text-amber-300 text-sm mb-0.5 flex items-center gap-1.5">
+                <Globe className="w-4 h-4" />
+                <span>1. Salas Abertas vs Salas Privadas</span>
+              </h3>
               <p>
-                O anfitrião inicia a partida e todos os participantes conectados na mesma sala veem as pedras sorteadas no mesmo segundo através de sincronização WebRTC.
+                Salas Abertas ficam listadas publicamente com a contagem de jogadores em tempo real, permitindo que novos participantes entrem com apenas 1 clique. Já as salas privadas só podem ser acessadas por quem possuir o código de 6 dígitos.
               </p>
             </div>
 
-            <div>
-              <h3 className="font-bold text-cyan-300 text-sm mb-0.5">2. Modalidades 75 e 90 Bolas</h3>
+            <div className="bg-white/5 p-3.5 rounded-2xl border border-white/5">
+              <h3 className="font-bold text-cyan-300 text-sm mb-0.5 flex items-center gap-1.5">
+                <Dices className="w-4 h-4" />
+                <span>2. Bingo 75 e Bingo 90</span>
+              </h3>
               <p>
-                No Bingo 75, cada coluna corresponde a uma faixa de 15 números (B: 1-15 até O: 61-75) e o centro é livre. No Bingo 90, as cartelas têm 15 números distribuídos em 3 linhas.
+                No Bingo 75, cada coluna corresponde a uma letra (B: 1-15, I: 16-30, N: 31-45, G: 46-60, O: 61-75) e o centro é livre. No Bingo 90, as cartelas possuem 15 números em 3 linhas de 5.
               </p>
             </div>
 
-            <div>
-              <h3 className="font-bold text-emerald-300 text-sm mb-0.5">3. Auditoria de Vitória</h3>
+            <div className="bg-white/5 p-3.5 rounded-2xl border border-white/5">
+              <h3 className="font-bold text-emerald-300 text-sm mb-0.5 flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4" />
+                <span>3. Auditoria Matemática de Vitória</span>
+              </h3>
               <p>
-                Ao clicar em "GRITAR BINGO!", o sistema valida matematicamente todos os números marcados contra o histórico oficial do sorteio para coroar o campeão!
+                Ao clicar no botão "Gritar BINGO!", o sistema valida matematicamente todos os números marcados na sua cartela contra o histórico oficial de pedras sorteadas, disparando a celebração com confetes para toda a sala.
               </p>
             </div>
           </div>
 
           <button
-            onClick={() => setActiveTab('create')}
-            className="w-full py-3 rounded-2xl text-xs font-black uppercase font-display text-slate-950 bg-amber-400 hover:bg-amber-300 transition-colors cursor-pointer shadow-md"
+            onClick={() => setActiveTab('openRooms')}
+            className="w-full py-3 rounded-2xl text-xs font-black uppercase font-display text-slate-950 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 transition-colors cursor-pointer shadow-md"
           >
-            Voltar e Jogar
+            Ver Salas Abertas
           </button>
         </div>
       )}
+
+      {/* PWA Install Banner */}
+      <PWAInstallButton variant="banner" className="max-w-4xl mx-auto" />
     </div>
   );
 };

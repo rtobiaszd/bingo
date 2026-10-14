@@ -73,7 +73,7 @@ export const BingoCardView: React.FC<BingoCardViewProps> = ({
           /* BINGO 75 Mode (5x5 Grid) */
           <div>
             {/* Letters Header */}
-            <div className="grid grid-cols-5 gap-2 sm:gap-2.5 mb-3">
+            <div className="grid grid-cols-5 gap-1.5 sm:gap-2.5 mb-2.5 sm:mb-3">
               {[
                 { letter: 'B', color: 'from-blue-500 to-cyan-500' },
                 { letter: 'I', color: 'from-rose-500 to-pink-500' },
@@ -83,15 +83,15 @@ export const BingoCardView: React.FC<BingoCardViewProps> = ({
               ].map(({ letter, color }) => (
                 <div
                   key={letter}
-                  className={`py-2.5 rounded-2xl text-center font-black text-base sm:text-lg tracking-wider text-slate-950 font-display shadow-lg bg-gradient-to-b ${color}`}
+                  className={`py-2 sm:py-2.5 rounded-xl sm:rounded-2xl text-center font-black text-sm sm:text-lg tracking-wider text-slate-950 font-display shadow-lg bg-gradient-to-b ${color}`}
                 >
                   {letter}
                 </div>
               ))}
             </div>
 
-            {/* 5x5 Cells: Ample padding, rounded-2xl, large Fredoka typography */}
-            <div className="grid grid-cols-5 gap-2 sm:gap-2.5">
+            {/* 5x5 Cells: Responsive padding, rounded-xl/2xl, large Fredoka typography */}
+            <div className="grid grid-cols-5 gap-1.5 sm:gap-2.5">
               {cardNumbers.map((row, r) =>
                 row.map((val, c) => {
                   const isFree = r === 2 && c === 2 && val === 0;
@@ -104,7 +104,7 @@ export const BingoCardView: React.FC<BingoCardViewProps> = ({
                       key={`cell-${r}-${c}`}
                       onClick={() => onToggleCell(r, c)}
                       disabled={isFree}
-                      className={`h-15 sm:h-17 md:h-19 rounded-2xl border flex flex-col items-center justify-center relative select-none transition-all duration-200 cursor-pointer active:scale-90 ${
+                      className={`h-13 sm:h-16 md:h-19 rounded-xl sm:rounded-2xl border flex flex-col items-center justify-center relative select-none transition-all duration-200 cursor-pointer active:scale-90 touch-manipulation ${
                         isFree
                           ? 'bg-gradient-to-tr from-amber-400/30 via-orange-500/30 to-amber-300/30 border-amber-400/50 text-amber-300 font-black shadow-inner cursor-default'
                           : isMarked
@@ -116,7 +116,7 @@ export const BingoCardView: React.FC<BingoCardViewProps> = ({
                     >
                       {/* Number with large rounded Fredoka typography */}
                       <span
-                        className={`font-game text-xl sm:text-2xl md:text-3xl font-bold tracking-tight ${
+                        className={`font-game text-lg sm:text-2xl md:text-3xl font-bold tracking-tight ${
                           isMarked ? 'scale-105' : 'text-slate-100'
                         }`}
                       >
@@ -126,13 +126,13 @@ export const BingoCardView: React.FC<BingoCardViewProps> = ({
                       {/* Optional marker overlay badge */}
                       {isMarked && marker.iconName !== 'fill' && !isFree && (
                         <div className="absolute top-1 right-1 pointer-events-none drop-shadow-md">
-                          <MarkerIcon iconName={marker.iconName} color={marker.color} size={16} />
+                          <MarkerIcon iconName={marker.iconName} color={marker.color} size={14} />
                         </div>
                       )}
 
                       {/* Pulsing indicator when ball has dropped and needs marking */}
                       {isPendingMark && (
-                        <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_#f59e0b]" />
+                        <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_#f59e0b]" />
                       )}
                     </button>
                   );
@@ -144,7 +144,7 @@ export const BingoCardView: React.FC<BingoCardViewProps> = ({
           /* BINGO 90 Mode (3x9 Grid) */
           <div>
             {/* Column range hints header */}
-            <div className="grid grid-cols-9 gap-1 sm:gap-1.5 mb-2.5 text-center text-[10px] sm:text-xs font-display font-bold text-slate-400">
+            <div className="grid grid-cols-9 gap-0.5 sm:gap-1.5 mb-2 text-center text-[9px] sm:text-xs font-display font-bold text-slate-400">
               {['1-9', '10s', '20s', '30s', '40s', '50s', '60s', '70s', '80s'].map((colLabel) => (
                 <div key={colLabel} className="truncate">
                   {colLabel}
@@ -153,7 +153,7 @@ export const BingoCardView: React.FC<BingoCardViewProps> = ({
             </div>
 
             {/* 3x9 Cells */}
-            <div className="grid grid-cols-9 gap-1 sm:gap-1.5">
+            <div className="grid grid-cols-9 gap-0.5 sm:gap-1.5">
               {cardNumbers.map((row, r) =>
                 row.map((val, c) => {
                   const isEmpty = val === 0;
@@ -165,9 +165,9 @@ export const BingoCardView: React.FC<BingoCardViewProps> = ({
                     return (
                       <div
                         key={`cell-empty-${r}-${c}`}
-                        className="h-13 sm:h-15 md:h-17 rounded-xl bg-black/20 border border-white/[0.03] flex items-center justify-center"
+                        className="h-10 sm:h-14 md:h-16 rounded-lg sm:rounded-xl bg-black/20 border border-white/[0.03] flex items-center justify-center"
                       >
-                        <span className="text-white/10 text-xs font-mono">✦</span>
+                        <span className="text-white/10 text-[10px] sm:text-xs font-mono">✦</span>
                       </div>
                     );
                   }
@@ -176,26 +176,30 @@ export const BingoCardView: React.FC<BingoCardViewProps> = ({
                     <button
                       key={`cell-${r}-${c}`}
                       onClick={() => onToggleCell(r, c)}
-                      className={`h-13 sm:h-15 md:h-17 rounded-xl border flex items-center justify-center relative select-none transition-all duration-200 cursor-pointer active:scale-90 ${
+                      className={`h-10 sm:h-14 md:h-16 rounded-lg sm:rounded-xl border flex items-center justify-center relative select-none transition-all duration-200 cursor-pointer active:scale-90 touch-manipulation ${
                         isMarked
                           ? `${theme.markedBg} ${theme.markedText} border-white/30 animate-mark-pop shadow-md`
                           : isPendingMark
                           ? `${theme.cellBg} ${theme.cellText} border-amber-400 ring-2 ring-amber-400/50 animate-pulse`
-                          : `${theme.cellBg} ${theme.cellText} ${theme.cellBorder} hover:scale-[1.03] hover:border-cyan-400/50`
+                          : `${theme.cellBg} ${theme.cellText} ${theme.cellBorder} hover:scale-[1.02]`
                       }`}
                     >
-                      <span className="font-game text-base sm:text-lg md:text-xl font-bold">
+                      <span
+                        className={`font-game text-xs sm:text-lg md:text-xl font-bold tracking-tight ${
+                          isMarked ? 'scale-105' : 'text-slate-100'
+                        }`}
+                      >
                         {val}
                       </span>
 
                       {isMarked && marker.iconName !== 'fill' && (
-                        <div className="absolute top-1 right-1 pointer-events-none drop-shadow-sm">
-                          <MarkerIcon iconName={marker.iconName} color={marker.color} size={13} />
+                        <div className="absolute top-0.5 right-0.5 pointer-events-none drop-shadow">
+                          <MarkerIcon iconName={marker.iconName} color={marker.color} size={11} />
                         </div>
                       )}
 
                       {isPendingMark && (
-                        <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-amber-400 shadow-[0_0_6px_#f59e0b]" />
+                        <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-amber-400 shadow-[0_0_6px_#f59e0b]" />
                       )}
                     </button>
                   );

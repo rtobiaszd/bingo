@@ -1,4 +1,4 @@
-import { BingoMode, ChatMessage, PlayerProfile, RoomState, WinningRule } from '../types/bingo';
+import { BingoMode, ChatMessage, PlayerProfile, RoomState, WinningRule, PublicRoomSummary } from '../types/bingo';
 import { generate75Card, generate90Card, checkVictory, get75BallLetter } from '../utils/bingoRules';
 import { soundService } from './soundService';
 import { fireBingoConfetti } from '../utils/confetti';
@@ -17,14 +17,7 @@ class MultiplayerService {
   private listeners: Set<RoomEventListener> = new Set();
   private autoDrawTimer: NodeJS.Timeout | null = null;
   private serverPollTimer: NodeJS.Timeout | null = null;
-  private cachedServerRooms: {
-    id: string;
-    code: string;
-    name: string;
-    mode: string;
-    playerCount: number;
-    status: string;
-  }[] = [];
+  private cachedServerRooms: PublicRoomSummary[] = [];
   private lastTimerSpeed: number = 0;
   private lastTimerStatus: string = '';
 
@@ -102,20 +95,29 @@ class MultiplayerService {
     return null;
   }
 
-  public getAvailableLocalRooms(): {
-    id: string;
-    code: string;
-    name: string;
-    mode: string;
-    playerCount: number;
-    status: string;
-  }[] {
+  public async fetchOpenRooms(): Promise<PublicRoomSummary[]> {
+    if (typeof window === 'undefined') return [];
+    try {
+      const res = await fetch('/api/rooms');
+      if (res.ok) {
+        const list = await res.json();
+        if (Array.isArray(list)) {
+          this.cachedServerRooms = list;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return this.getAvailableLocalRooms();
+  }
+
+  public getAvailableLocalRooms(): PublicRoomSummary[] {
     if (typeof window === 'undefined') return [];
 
-    // Trigger async refresh from server
+    // Trigger async refresh in background
     fetch('/api/rooms')
       .then((r) => (r.ok ? r.json() : []))
-      .then((serverList) => {
+      .then((serverList: PublicRoomSummary[]) => {
         if (Array.isArray(serverList)) {
           this.cachedServerRooms = serverList;
         }
@@ -123,31 +125,34 @@ class MultiplayerService {
       .catch(() => {});
 
     const seenCodes = new Set<string>();
-    const rooms: {
-      id: string;
-      code: string;
-      name: string;
-      mode: string;
-      playerCount: number;
-      status: string;
-    }[] = [];
+    const rooms: PublicRoomSummary[] = [];
 
-    // 1. Local storage rooms
+    // 1. Local storage open rooms (exclude private rooms with code!)
     const now = Date.now();
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (key && key.startsWith(STORAGE_KEY_PREFIX)) {
         try {
           const room = JSON.parse(localStorage.getItem(key)!) as RoomState;
-          if (room && room.code && now - room.createdAt < 6 * 3600 * 1000) {
+          // Filter: only show if NOT private and recent (< 6 hours)
+          if (room && room.code && !room.isPrivate && now - room.createdAt < 6 * 3600 * 1000) {
             seenCodes.add(room.code);
+            const hostPlayer = room.players && room.hostId ? room.players[room.hostId] : null;
             rooms.push({
               id: room.id,
               code: room.code,
-              name: room.name,
-              mode: room.mode === 'BINGO_75' ? '75 Bolas' : '90 Bolas',
+              name: room.name || (hostPlayer ? `Sala de ${hostPlayer.name}` : 'Mesa Aberta'),
+              hostName: hostPlayer?.name || 'Anfitrião',
+              hostAvatar: hostPlayer?.avatar || '👑',
+              mode: room.mode,
+              modeLabel: room.mode === 'BINGO_75' ? '75 Bolas' : '90 Bolas',
               playerCount: Object.keys(room.players || {}).length,
+              maxPlayers: room.maxPlayers || 20,
               status: room.status,
+              isPrivate: false,
+              winningRule: room.winningRule,
+              drawSpeedSeconds: room.drawSpeedSeconds,
+              createdAt: room.createdAt,
             });
           }
         } catch {
@@ -156,7 +161,7 @@ class MultiplayerService {
       }
     }
 
-    // 2. Server API rooms from other devices
+    // 2. Server API rooms from other devices (already filtered to only open rooms)
     for (const sr of this.cachedServerRooms) {
       if (sr && sr.code && !seenCodes.has(sr.code)) {
         seenCodes.add(sr.code);
@@ -237,7 +242,9 @@ class MultiplayerService {
     avatar: string,
     mode: BingoMode = 'BINGO_75',
     winningRule: WinningRule = 'ANY',
-    drawSpeedSeconds: number = 4
+    drawSpeedSeconds: number = 4,
+    isPrivate: boolean = false,
+    customRoomName?: string
   ): { room: RoomState; playerId: string } {
     this.leaveRoom();
 
@@ -266,12 +273,14 @@ class MultiplayerService {
     const newRoom: RoomState = {
       id: roomId,
       code: roomCode,
-      name: `Sala de ${hostPlayer.name}`,
+      name: (customRoomName && customRoomName.trim()) || `Mesa de ${hostPlayer.name}`,
       hostId: playerId,
       mode,
       status: 'WAITING',
       drawSpeedSeconds,
       winningRule,
+      isPrivate,
+      maxPlayers: 20,
       drawnBalls: [],
       currentBall: null,
       previousBalls: [],

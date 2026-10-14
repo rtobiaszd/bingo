@@ -60,6 +60,23 @@ export interface WinnerAudit {
   timestamp: number;
 }
 
+export interface PublicRoomSummary {
+  id: string;
+  code: string;
+  name: string;
+  hostName: string;
+  hostAvatar?: string;
+  mode: BingoMode;
+  modeLabel: string;
+  playerCount: number;
+  maxPlayers: number;
+  status: RoomStatus;
+  isPrivate: boolean;
+  winningRule: WinningRule;
+  drawSpeedSeconds: number;
+  createdAt: number;
+}
+
 export interface RoomState {
   id: string;
   code: string;
@@ -69,6 +86,8 @@ export interface RoomState {
   status: RoomStatus;
   drawSpeedSeconds: number; // 3 to 10
   winningRule: WinningRule;
+  isPrivate?: boolean; // false = open public room in browser list; true = private room with code only
+  maxPlayers?: number;
   drawnBalls: number[];
   currentBall: number | null;
   previousBalls: number[];

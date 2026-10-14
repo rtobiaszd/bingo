@@ -1,5 +1,6 @@
 import React from 'react';
 import { Volume2, VolumeX, Mic, MicOff, Palette, Grid3X3, LogOut, Sparkles } from 'lucide-react';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface NavbarProps {
   roomCode?: string;
@@ -93,8 +94,11 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </nav>
 
-      {/* Zone 3: 1 Primary Action */}
+      {/* Zone 3: Actions & PWA Install */}
       <div className="flex items-center gap-2 shrink-0">
+        {/* PWA Install in Header */}
+        <PWAInstallButton variant="header" />
+
         <div className="flex md:hidden items-center gap-1 mr-1">
           <button
             onClick={onOpenCustomizer}

@@ -18,6 +18,7 @@ import { ChatPanel } from './components/ChatPanel';
 import { CustomizerModal } from './components/CustomizerModal';
 import { BallBoardModal } from './components/BallBoardModal';
 import { WinnerCelebrationModal } from './components/WinnerCelebrationModal';
+import { OfflineIndicator } from './components/OfflineIndicator';
 import { AlertCircle, CheckCircle, Info } from 'lucide-react';
 
 export default function App() {
@@ -90,18 +91,27 @@ export default function App() {
     avatar: string,
     mode: BingoMode,
     rule: WinningRule,
-    speed: number
+    speed: number,
+    isPrivate: boolean = false,
+    roomName?: string
   ) => {
     const { room: newRoom, playerId } = multiplayerService.createRoom(
       hostName,
       avatar,
       mode,
       rule,
-      speed
+      speed,
+      isPrivate,
+      roomName
     );
     setRoom(newRoom);
     setCurrentPlayerId(playerId);
-    showToast(`Sala criada com sucesso! Código: ${newRoom.code}`, 'success');
+    showToast(
+      isPrivate
+        ? `Sala privada criada! Código de acesso: ${newRoom.code}`
+        : `Sala pública aberta criada! Outros jogadores já podem entrar.`,
+      'success'
+    );
   };
 
   // Async room join with proper await and error handling
@@ -369,6 +379,9 @@ export default function App() {
           onClose={() => setIsWinnerDismissed(true)}
         />
       )}
+
+      {/* Network Connectivity Status Indicator for PWA */}
+      <OfflineIndicator />
     </div>
   );
 }

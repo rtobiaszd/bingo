@@ -25,17 +25,32 @@ setInterval(() => {
 }, 30 * 60 * 1000);
 
 // API Endpoints for cross-device multiplayer
-app.get('/api/rooms', (_req, res) => {
-  const activeRooms = Array.from(roomsStore.values()).map((r) => ({
-    id: r.id,
-    code: r.code,
-    name: r.name,
-    mode: r.mode === 'BINGO_75' ? '75 Bolas' : '90 Bolas',
-    playerCount: Object.keys(r.players || {}).length,
-    status: r.status,
-    createdAt: r.createdAt,
-  }));
-  res.json(activeRooms);
+// Retorna APENAS salas criadas ABERTAS (públicas), excluindo salas privadas protegidas por código
+app.get(['/api/rooms', '/api/rooms/open'], (_req, res) => {
+  const openRooms = Array.from(roomsStore.values())
+    .filter((r) => r.isPrivate !== true) // Somente salas abertas
+    .map((r) => {
+      const hostPlayer = r.players && r.hostId ? r.players[r.hostId] : null;
+      return {
+        id: r.id,
+        code: r.code,
+        name: r.name || (hostPlayer ? `Sala de ${hostPlayer.name}` : 'Mesa Aberta'),
+        hostName: hostPlayer?.name || 'Anfitrião',
+        hostAvatar: hostPlayer?.avatar || '👑',
+        mode: r.mode,
+        modeLabel: r.mode === 'BINGO_75' ? '75 Bolas' : '90 Bolas',
+        playerCount: Object.keys(r.players || {}).length,
+        maxPlayers: r.maxPlayers || 20,
+        status: r.status,
+        isPrivate: false,
+        winningRule: r.winningRule || 'ANY',
+        drawSpeedSeconds: r.drawSpeedSeconds || 4,
+        createdAt: r.createdAt || Date.now(),
+      };
+    })
+    .sort((a, b) => b.createdAt - a.createdAt);
+
+  res.json(openRooms);
 });
 
 app.get('/api/rooms/:code', (req, res) => {

@@ -48,19 +48,30 @@ export const WaitingRoomView: React.FC<WaitingRoomViewProps> = ({
 
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
           <div>
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
               <span className="text-xs font-black text-amber-300 uppercase tracking-widest bg-amber-500/20 px-3 py-1 rounded-full border border-amber-400/30 font-display shadow-sm">
                 Sala de Espera
               </span>
               <span className="text-xs text-cyan-300 font-bold font-mono px-2.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20">
                 {room.mode === 'BINGO_75' ? 'Bingo 75 Bolas' : 'Bingo 90 Bolas'}
               </span>
+              <span
+                className={`text-xs font-bold px-2.5 py-1 rounded-full border flex items-center gap-1 ${
+                  room.isPrivate
+                    ? 'bg-purple-500/15 text-purple-300 border-purple-500/30'
+                    : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                }`}
+              >
+                <span>{room.isPrivate ? '🔒 Sala Privada' : '🌐 Sala Aberta (Pública)'}</span>
+              </span>
             </div>
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-white font-display tracking-tight">
               {room.name}
             </h1>
             <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-md">
-              Envie o código abaixo aos seus amigos para jogarem juntos no mesmo globo em tempo real!
+              {room.isPrivate
+                ? 'Compartilhe o código de acesso abaixo com quem você desejar convidar para esta mesa privada.'
+                : 'Esta mesa está aberta e visível na lista pública para qualquer jogador entrar direto!'}
             </p>
           </div>
 

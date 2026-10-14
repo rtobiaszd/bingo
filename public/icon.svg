@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background Radial Gradient -->
+    <radialGradient id="bgGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1e1b4b" />
+      <stop offset="100%" stop-color="#070a14" />
+    </radialGradient>
+
+    <!-- Ball Body Gradient (Golden Amber) -->
+    <radialGradient id="ballBody" cx="35%" cy="30%" r="65%">
+      <stop offset="0%" stop-color="#fef08a" />
+      <stop offset="25%" stop-color="#f59e0b" />
+      <stop offset="70%" stop-color="#d97706" />
+      <stop offset="100%" stop-color="#78350f" />
+    </radialGradient>
+
+    <!-- Glowing Outer Ring -->
+    <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="50%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#ec4899" />
+    </linearGradient>
+
+    <!-- Center White Badge Gradient -->
+    <linearGradient id="badgeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#f1f5f9" />
+    </linearGradient>
+
+    <!-- Gloss Highlight -->
+    <linearGradient id="glossGrad" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+    </linearGradient>
+
+    <!-- Drop Shadows -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#f59e0b" flood-opacity="0.5" />
+    </filter>
+  </defs>
+
+  <!-- App Rounded Base -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)" />
+
+  <!-- Outer Neon Halo Ring -->
+  <circle cx="256" cy="256" r="195" fill="none" stroke="url(#ringGrad)" stroke-width="6" opacity="0.4" />
+
+  <!-- Main Bingo Ball Sphere with Shadow -->
+  <circle cx="256" cy="256" r="170" fill="url(#ballBody)" filter="url(#glow)" />
+
+  <!-- Specular Top Rim Reflection -->
+  <ellipse cx="256" cy="135" rx="90" ry="32" fill="url(#glossGrad)" opacity="0.75" />
+
+  <!-- Center White Emblem Badge -->
+  <circle cx="256" cy="256" r="92" fill="url(#badgeGrad)" stroke="#b45309" stroke-width="4" />
+  <circle cx="256" cy="256" r="82" fill="none" stroke="#f59e0b" stroke-width="2" stroke-dasharray="6,4" />
+
+  <!-- Bold 'B' Bingo Icon Letter -->
+  <text x="256" y="296" text-anchor="middle" font-family="'Arial Black', 'Poppins', sans-serif" font-weight="900" font-size="118" fill="#1e1b4b" letter-spacing="-2">
+    B
+  </text>
+
+  <!-- Number 77 Mini-Tag -->
+  <rect x="220" y="380" width="72" height="26" rx="13" fill="#f59e0b" />
+  <text x="256" y="398" text-anchor="middle" font-family="'Arial Black', sans-serif" font-weight="900" font-size="16" fill="#070a14">
+    77
+  </text>
+
+  <!-- Four Lucky Stars -->
+  <path d="M120 140 L124 152 L136 154 L127 162 L130 174 L120 167 L110 174 L113 162 L104 154 L116 152 Z" fill="#38bdf8" opacity="0.9" />
+  <path d="M390 145 L393 154 L403 155 L395 162 L398 171 L390 166 L382 171 L385 162 L377 155 L387 154 Z" fill="#ec4899" opacity="0.9" />
+  <path d="M100 370 L103 378 L112 379 L105 385 L107 394 L100 389 L93 394 L95 385 L88 379 L97 378 Z" fill="#fbbf24" opacity="0.9" />
+  <path d="M410 360 L413 368 L422 369 L415 375 L417 384 L410 379 L403 384 L405 375 L398 369 L407 368 Z" fill="#34d399" opacity="0.9" />
+</svg>
