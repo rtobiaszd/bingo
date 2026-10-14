@@ -2,62 +2,127 @@
 
 @layer base {
   body {
-    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-    background-color: #121316;
-    color: #f4f4f5;
+    font-family: 'Poppins', system-ui, -apple-system, sans-serif;
+    background-color: #0b0f19;
+    color: #f8fafc;
     overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Poppins', 'Inter', sans-serif;
+    font-family: 'Montserrat', 'Poppins', sans-serif;
     letter-spacing: -0.02em;
   }
 }
 
-/* Subtle micro-interaction for marking cells (matte, solid, quick settle) */
-@keyframes cellMark {
+.font-game {
+  font-family: 'Fredoka', 'Poppins', sans-serif;
+}
+
+.font-display {
+  font-family: 'Montserrat', sans-serif;
+}
+
+/* Glowing ball spotlight pulse */
+@keyframes spotlightPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 25px rgba(245, 158, 11, 0.35), inset 0 0 15px rgba(255, 255, 255, 0.2);
+  }
+  50% {
+    transform: scale(1.04);
+    box-shadow: 0 0 40px rgba(245, 158, 11, 0.65), 0 0 70px rgba(234, 88, 12, 0.35), inset 0 0 20px rgba(255, 255, 255, 0.4);
+  }
+}
+
+/* 3D Levitation & Subtle Rotation for Lottery Ball */
+@keyframes ball3DFloat {
   0% {
-    transform: scale(0.96);
+    transform: translateY(0px) rotateY(-9deg) rotateX(6deg) rotateZ(-1deg);
+  }
+  25% {
+    transform: translateY(-5px) rotateY(5deg) rotateX(9deg) rotateZ(1.5deg);
+  }
+  50% {
+    transform: translateY(-9px) rotateY(12deg) rotateX(-5deg) rotateZ(2deg);
+  }
+  75% {
+    transform: translateY(-4px) rotateY(-3deg) rotateX(-8deg) rotateZ(-1deg);
+  }
+  100% {
+    transform: translateY(0px) rotateY(-9deg) rotateX(6deg) rotateZ(-1deg);
+  }
+}
+
+/* Ground shadow syncing with 3D levitation */
+@keyframes ballShadowSync {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.65;
+  }
+  50% {
+    transform: scale(0.72);
+    opacity: 0.3;
+  }
+}
+
+/* Initial 3D tumble when a new ball arrives */
+@keyframes ballEntrance3D {
+  0% {
+    transform: scale(0.55) translateY(24px) rotateY(-180deg) rotateX(50deg);
+    opacity: 0;
+  }
+  65% {
+    transform: scale(1.08) translateY(-8px) rotateY(20deg) rotateX(-10deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) translateY(0) rotateY(-9deg) rotateX(6deg);
+    opacity: 1;
+  }
+}
+
+.animate-ball-3d {
+  animation: ballEntrance3D 0.55s cubic-bezier(0.18, 0.89, 0.32, 1.28) 0s 1 normal forwards, ball3DFloat 5s ease-in-out 0.55s infinite;
+}
+
+.animate-ball-shadow {
+  animation: ballShadowSync 5s ease-in-out 0.55s infinite;
+}
+
+/* Marked cell pop and settle */
+@keyframes markPop {
+  0% {
+    transform: scale(0.85);
+  }
+  60% {
+    transform: scale(1.08);
   }
   100% {
     transform: scale(1);
   }
 }
 
-/* Smooth ball slide-in */
-@keyframes ballSlide {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
+/* Subtle float for gamified cards */
+@keyframes floatSlow {
+  0%, 100% {
     transform: translateY(0);
   }
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+  50% {
+    transform: translateY(-4px);
   }
 }
 
-.animate-cell-mark {
-  animation: cellMark 0.12s ease-out forwards;
+.animate-spotlight {
+  animation: spotlightPulse 2s ease-in-out infinite;
 }
 
-.animate-ball-slide {
-  animation: ballSlide 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+.animate-mark-pop {
+  animation: markPop 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
 
-.animate-fade-in {
-  animation: fadeIn 0.18s ease-out forwards;
+.animate-float-slow {
+  animation: floatSlow 4s ease-in-out infinite;
 }
 
 /* Discreet scrollbar */
@@ -71,10 +136,10 @@
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: rgba(82, 82, 91, 0.4);
-  border-radius: 4px;
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 9999px;
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: rgba(113, 113, 122, 0.6);
+  background: rgba(148, 163, 184, 0.4);
 }

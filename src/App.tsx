@@ -23,6 +23,7 @@ import { AlertCircle, CheckCircle, Info } from 'lucide-react';
 export default function App() {
   const [room, setRoom] = useState<RoomState | null>(null);
   const [currentPlayerId, setCurrentPlayerId] = useState<string | null>(null);
+  const [initialRoomCode, setInitialRoomCode] = useState<string>('');
 
   // Modals state
   const [isCustomizerOpen, setIsCustomizerOpen] = useState(false);
@@ -43,6 +44,17 @@ export default function App() {
     setToast({ message, type });
     setTimeout(() => setToast(null), 4000);
   };
+
+  // Check URL params on initial load
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('room');
+      if (code) {
+        setInitialRoomCode(code.trim().toUpperCase());
+      }
+    }
+  }, []);
 
   // Subscribe to multiplayer engine
   useEffect(() => {
@@ -92,16 +104,21 @@ export default function App() {
     showToast(`Sala criada com sucesso! Código: ${newRoom.code}`, 'success');
   };
 
-  const handleJoinRoom = (code: string, playerName: string, avatar: string) => {
-    const res = multiplayerService.joinRoom(code, playerName, avatar);
-    if (!res.success) {
-      showToast(res.error || 'Erro ao entrar na sala', 'error');
-      return;
-    }
-    if (res.room && res.playerId) {
-      setRoom(res.room);
-      setCurrentPlayerId(res.playerId);
-      showToast('Entrou na sala com sucesso!', 'success');
+  // Async room join with proper await and error handling
+  const handleJoinRoom = async (code: string, playerName: string, avatar: string) => {
+    try {
+      const res = await multiplayerService.joinRoom(code, playerName, avatar);
+      if (!res.success) {
+        showToast(res.error || 'Erro ao entrar na sala', 'error');
+        return;
+      }
+      if (res.room && res.playerId) {
+        setRoom(res.room);
+        setCurrentPlayerId(res.playerId);
+        showToast('Entrou na sala com sucesso!', 'success');
+      }
+    } catch (err: any) {
+      showToast(err?.message || 'Erro ao conectar à sala', 'error');
     }
   };
 
@@ -110,6 +127,21 @@ export default function App() {
     setRoom(null);
     setCurrentPlayerId(null);
     showToast('Você saiu da sala.', 'info');
+  };
+
+  // Bot management
+  const handleAddBot = () => {
+    const success = multiplayerService.addBotPlayer();
+    if (success) {
+      showToast('Convidado adicionado à mesa!', 'success');
+    } else {
+      showToast('Não foi possível adicionar mais convidados.', 'error');
+    }
+  };
+
+  const handleRemovePlayer = (id: string) => {
+    multiplayerService.removePlayer(id);
+    showToast('Participante removido da mesa.', 'info');
   };
 
   // Game control handlers
@@ -182,22 +214,27 @@ export default function App() {
     : MARKER_STYLES[0];
 
   return (
-    <div className="min-h-screen bg-[#121316] text-zinc-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-zinc-950">
+    <div className="min-h-screen bg-gradient-to-b from-[#070a14] via-[#0c1024] to-[#120e2e] text-slate-100 flex flex-col font-sans relative overflow-x-hidden selection:bg-amber-500 selection:text-slate-950">
+      {/* Immersive ambient luminous mesh */}
+      <div className="fixed -top-40 -left-40 w-96 h-96 bg-cyan-500/10 rounded-full blur-[120px] pointer-events-none" />
+      <div className="fixed top-1/3 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-amber-500/8 rounded-full blur-[140px] pointer-events-none" />
+      <div className="fixed -bottom-40 -right-40 w-96 h-96 bg-purple-600/10 rounded-full blur-[120px] pointer-events-none" />
+
       {/* Toast Alert */}
       {toast && (
-        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
           <div
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-md text-xs font-medium shadow-md border backdrop-blur-sm ${
+            className={`flex items-center gap-2.5 px-4 py-2.5 rounded-2xl text-xs font-bold font-display shadow-2xl border backdrop-blur-xl transition-all ${
               toast.type === 'success'
-                ? 'bg-[#18191e] text-emerald-300 border-emerald-500/40'
+                ? 'bg-slate-900/90 text-emerald-300 border-emerald-400/50 shadow-emerald-500/20'
                 : toast.type === 'error'
-                ? 'bg-[#18191e] text-red-300 border-red-500/40'
-                : 'bg-[#18191e] text-zinc-200 border-zinc-700'
+                ? 'bg-slate-900/90 text-rose-300 border-rose-400/50 shadow-rose-500/20'
+                : 'bg-slate-900/90 text-slate-200 border-white/20 shadow-black/40'
             }`}
           >
-            {toast.type === 'success' && <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />}
-            {toast.type === 'error' && <AlertCircle className="w-3.5 h-3.5 text-red-400" />}
-            {toast.type === 'info' && <Info className="w-3.5 h-3.5 text-zinc-400" />}
+            {toast.type === 'success' && <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />}
+            {toast.type === 'error' && <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />}
+            {toast.type === 'info' && <Info className="w-4 h-4 text-cyan-400 shrink-0" />}
             <span>{toast.message}</span>
           </div>
         </div>
@@ -217,10 +254,14 @@ export default function App() {
       />
 
       {/* Main View Area */}
-      <main className="flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 md:p-8 flex flex-col justify-start">
+      <main className="flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 md:p-8 flex flex-col justify-start relative z-10">
         {!room ? (
           /* Zero-State: Lobby View */
-          <LobbyView onCreateRoom={handleCreateRoom} onJoinRoom={handleJoinRoom} />
+          <LobbyView
+            onCreateRoom={handleCreateRoom}
+            onJoinRoom={handleJoinRoom}
+            initialCode={initialRoomCode}
+          />
         ) : room.status === 'WAITING' ? (
           /* Pre-Game: Waiting Room View */
           <WaitingRoomView
@@ -229,6 +270,8 @@ export default function App() {
             isHost={isHost}
             onStartGame={handleStartGame}
             onOpenCustomizer={() => setIsCustomizerOpen(true)}
+            onAddBot={handleAddBot}
+            onRemovePlayer={handleRemovePlayer}
           />
         ) : (
           /* Live Game Table View */
@@ -242,6 +285,7 @@ export default function App() {
                 onDrawNext={handleDrawNext}
                 onSetSpeed={handleSetSpeed}
                 onRestartRound={handleRestartRound}
+                onAddBot={handleAddBot}
               />
             )}
 
@@ -258,9 +302,9 @@ export default function App() {
             />
 
             {/* Split Arena: Bingo Card on Left / Chat on Right */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
               {/* Left 2 Cols: Player's Interactive Bingo Card */}
-              <div className="lg:col-span-2 bg-[#18191e] border border-zinc-800 rounded-lg p-4 sm:p-6 shadow-sm flex flex-col items-center">
+              <div className="lg:col-span-2 bg-slate-900/60 backdrop-blur-2xl border border-white/10 rounded-3xl p-5 sm:p-7 shadow-2xl flex flex-col items-center">
                 {currentPlayer && (
                   <BingoCardView
                     mode={room.mode}
@@ -278,7 +322,7 @@ export default function App() {
               </div>
 
               {/* Right 1 Col: Integrated Chat & Social Events */}
-              <div className="lg:col-span-1 h-[460px]">
+              <div className="lg:col-span-1 h-[520px]">
                 <ChatPanel
                   messages={room.chat}
                   currentPlayerId={currentPlayerId || ''}
@@ -291,8 +335,8 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="w-full border-t border-zinc-900 py-4 px-6 text-center text-xs text-zinc-500">
-        <span>Bingo Real-Time Club · Salas Privadas · Bingo 75 & 90 Bolas · Locução e Chat ao Vivo</span>
+      <footer className="w-full border-t border-white/10 py-5 px-6 text-center text-xs text-slate-400 font-display relative z-10 bg-slate-950/60 backdrop-blur-md">
+        <span>Bingo Real-Time Club · Salas Privadas · 75 & 90 Bolas · Locução e Sorteio Sincronizado</span>
       </footer>
 
       {/* Modal: Customizer */}

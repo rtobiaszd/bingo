@@ -2,9 +2,11 @@ import { BingoMode, ChatMessage, PlayerProfile, RoomState, WinningRule } from '.
 import { generate75Card, generate90Card, checkVictory, get75BallLetter } from '../utils/bingoRules';
 import { soundService } from './soundService';
 import { fireBingoConfetti } from '../utils/confetti';
+import { Peer, DataConnection } from 'peerjs';
 
 const STORAGE_KEY_PREFIX = 'bingo_room_';
 const CHANNEL_NAME = 'bingo_club_realtime_bus';
+const PEER_PREFIX = 'bingo-club-room-';
 
 export type RoomEventListener = (room: RoomState) => void;
 
@@ -14,6 +16,22 @@ class MultiplayerService {
   private currentPlayerId: string | null = null;
   private listeners: Set<RoomEventListener> = new Set();
   private autoDrawTimer: NodeJS.Timeout | null = null;
+  private serverPollTimer: NodeJS.Timeout | null = null;
+  private cachedServerRooms: {
+    id: string;
+    code: string;
+    name: string;
+    mode: string;
+    playerCount: number;
+    status: string;
+  }[] = [];
+  private lastTimerSpeed: number = 0;
+  private lastTimerStatus: string = '';
+
+  // Cross-device PeerJS networking
+  private peer: Peer | null = null;
+  private hostConnections: Map<string, DataConnection> = new Map(); // For host: connected guests
+  private guestConnection: DataConnection | null = null; // For guest: connection to host
 
   constructor() {
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
@@ -25,7 +43,7 @@ class MultiplayerService {
         }
       };
 
-      // Also listen to storage events for cross-tab sync fallback
+      // Storage event for cross-tab sync fallback
       window.addEventListener('storage', (e) => {
         if (e.key && e.key.startsWith(STORAGE_KEY_PREFIX) && e.newValue) {
           try {
@@ -34,7 +52,7 @@ class MultiplayerService {
               this.handleIncomingRoom(updatedRoom, false);
             }
           } catch {
-            // parse error
+            // ignore
           }
         }
       });
@@ -43,7 +61,6 @@ class MultiplayerService {
 
   public subscribe(listener: RoomEventListener): () => void {
     this.listeners.add(listener);
-    // Emit current state immediately if present
     if (this.currentRoomId) {
       const room = this.getRoom(this.currentRoomId);
       if (room) listener(room);
@@ -85,17 +102,101 @@ class MultiplayerService {
     return null;
   }
 
+  public getAvailableLocalRooms(): {
+    id: string;
+    code: string;
+    name: string;
+    mode: string;
+    playerCount: number;
+    status: string;
+  }[] {
+    if (typeof window === 'undefined') return [];
+
+    // Trigger async refresh from server
+    fetch('/api/rooms')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((serverList) => {
+        if (Array.isArray(serverList)) {
+          this.cachedServerRooms = serverList;
+        }
+      })
+      .catch(() => {});
+
+    const seenCodes = new Set<string>();
+    const rooms: {
+      id: string;
+      code: string;
+      name: string;
+      mode: string;
+      playerCount: number;
+      status: string;
+    }[] = [];
+
+    // 1. Local storage rooms
+    const now = Date.now();
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(STORAGE_KEY_PREFIX)) {
+        try {
+          const room = JSON.parse(localStorage.getItem(key)!) as RoomState;
+          if (room && room.code && now - room.createdAt < 6 * 3600 * 1000) {
+            seenCodes.add(room.code);
+            rooms.push({
+              id: room.id,
+              code: room.code,
+              name: room.name,
+              mode: room.mode === 'BINGO_75' ? '75 Bolas' : '90 Bolas',
+              playerCount: Object.keys(room.players || {}).length,
+              status: room.status,
+            });
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    // 2. Server API rooms from other devices
+    for (const sr of this.cachedServerRooms) {
+      if (sr && sr.code && !seenCodes.has(sr.code)) {
+        seenCodes.add(sr.code);
+        rooms.push(sr);
+      }
+    }
+
+    return rooms;
+  }
+
   private saveAndBroadcast(room: RoomState) {
     if (typeof window === 'undefined') return;
     localStorage.setItem(STORAGE_KEY_PREFIX + room.id, JSON.stringify(room));
     if (this.channel) {
       this.channel.postMessage({ type: 'ROOM_UPDATE', payload: room });
     }
+
+    // Broadcast across all connected remote peer devices
+    this.hostConnections.forEach((conn) => {
+      if (conn.open) {
+        conn.send({ type: 'ROOM_UPDATE', room });
+      }
+    });
+
     this.notify(room);
+
+    // Synchronize host automatic draw timer
+    if (this.isCurrentPlayerHost(room)) {
+      this.syncHostTimer(room);
+    }
+
+    // Synchronize with central server for cross-device visibility
+    fetch(`/api/rooms/${room.code}/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(room),
+    }).catch(() => {});
   }
 
   private handleIncomingRoom(room: RoomState, fromLocal = true) {
-    // If incoming room has a new drawn ball and we didn't initiate it, play sound & speech
     const current = this.currentRoomId ? this.getRoom(this.currentRoomId) : null;
     if (current && room.drawnBalls.length > current.drawnBalls.length) {
       const newBall = room.drawnBalls[room.drawnBalls.length - 1];
@@ -107,15 +208,14 @@ class MultiplayerService {
       }
     }
 
-    // If incoming room declared a winner
     if (room.winner && (!current || !current.winner)) {
       soundService.playBingoFanfare();
       fireBingoConfetti();
     }
 
+    localStorage.setItem(STORAGE_KEY_PREFIX + room.id, JSON.stringify(room));
     this.notify(room);
 
-    // If we are host, manage auto timer
     if (this.isCurrentPlayerHost(room)) {
       this.syncHostTimer(room);
     }
@@ -131,7 +231,7 @@ class MultiplayerService {
     return this.currentPlayerId;
   }
 
-  // Create a brand new private room
+  // Create a brand new private room with cross-device WebRTC capability
   public createRoom(
     hostName: string,
     avatar: string,
@@ -139,6 +239,8 @@ class MultiplayerService {
     winningRule: WinningRule = 'ANY',
     drawSpeedSeconds: number = 4
   ): { room: RoomState; playerId: string } {
+    this.leaveRoom();
+
     const roomId = 'room_' + Math.random().toString(36).substring(2, 9);
     const roomCode = Math.floor(100000 + Math.random() * 900000).toString();
     const playerId = 'player_' + Math.random().toString(36).substring(2, 8);
@@ -146,16 +248,16 @@ class MultiplayerService {
     const initialCard = mode === 'BINGO_75' ? generate75Card() : generate90Card();
     const markedCells: boolean[][] = initialCard.map((row) => row.map(() => false));
     if (mode === 'BINGO_75') {
-      markedCells[2][2] = true; // Free space in center
+      markedCells[2][2] = true;
     }
 
     const hostPlayer: PlayerProfile = {
       id: playerId,
       name: hostName.trim() || 'Anfitrião',
-      avatar: avatar || '👤',
+      avatar: avatar || '👑',
       isHost: true,
-      themeId: 'grafite_menta',
-      markerId: 'fill_solid',
+      themeId: 'neon_night',
+      markerId: 'stamp_glow',
       cardNumbers: initialCard,
       markedCells,
       joinedAt: Date.now(),
@@ -179,7 +281,7 @@ class MultiplayerService {
           id: 'sys_' + Date.now(),
           senderId: 'system',
           senderName: 'Sistema',
-          text: `Bem-vindos ao Bingo Real-Time! Sala criada no modo ${mode === 'BINGO_75' ? '75 Bolas' : '90 Bolas'}.`,
+          text: `Bem-vindos ao Bingo Club! Sala criada no modo ${mode === 'BINGO_75' ? '75 Bolas' : '90 Bolas'}.`,
           timestamp: Date.now(),
           isSystem: true,
         },
@@ -193,59 +295,338 @@ class MultiplayerService {
     this.currentPlayerId = playerId;
     this.saveAndBroadcast(newRoom);
 
+    // Register on central server for cross-device discovery
+    fetch('/api/rooms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newRoom),
+    }).catch(() => {});
+
+    // Initialize Host PeerJS listener for remote cross-device guests
+    try {
+      this.initHostPeer(roomCode, newRoom);
+    } catch {
+      // Fallback to local
+    }
+
     return { room: newRoom, playerId };
   }
 
-  // Join an existing room with code
-  public joinRoom(
+  private initHostPeer(roomCode: string, initialRoom: RoomState) {
+    if (typeof window === 'undefined') return;
+    const peerId = PEER_PREFIX + roomCode;
+
+    this.peer = new Peer(peerId);
+
+    this.peer.on('connection', (conn) => {
+      conn.on('open', () => {
+        this.hostConnections.set(conn.peer, conn);
+        // Send current room state to new guest
+        const current = this.currentRoomId ? this.getRoom(this.currentRoomId) : initialRoom;
+        if (current) {
+          conn.send({ type: 'ROOM_UPDATE', room: current });
+        }
+      });
+
+      conn.on('data', (raw: unknown) => {
+        const data = raw as { type: string; payload?: unknown };
+        if (!data || !this.currentRoomId) return;
+        const room = this.getRoom(this.currentRoomId);
+        if (!room) return;
+
+        if (data.type === 'GUEST_JOIN') {
+          const { guestPlayer } = data.payload as { guestPlayer: PlayerProfile };
+          if (guestPlayer && !room.players[guestPlayer.id]) {
+            room.players[guestPlayer.id] = guestPlayer;
+            room.chat.push({
+              id: 'sys_' + Date.now(),
+              senderId: 'system',
+              senderName: 'Sistema',
+              text: `${guestPlayer.avatar} ${guestPlayer.name} entrou na sala!`,
+              timestamp: Date.now(),
+              isSystem: true,
+            });
+            this.saveAndBroadcast(room);
+          }
+        } else if (data.type === 'GUEST_ACTION') {
+          const { action, payload } = data.payload as { action: string; payload: any };
+          this.handleGuestAction(room, action, payload);
+        }
+      });
+
+      conn.on('close', () => {
+        this.hostConnections.delete(conn.peer);
+      });
+    });
+
+    this.peer.on('error', () => {
+      // Ignore or retry
+    });
+  }
+
+  private handleGuestAction(room: RoomState, action: string, payload: any) {
+    if (action === 'TOGGLE_CELL') {
+      const { playerId, r, c } = payload;
+      const player = room.players[playerId];
+      if (player) {
+        if (!(room.mode === 'BINGO_75' && r === 2 && c === 2)) {
+          player.markedCells[r][c] = !player.markedCells[r][c];
+          this.saveAndBroadcast(room);
+        }
+      }
+    } else if (action === 'AUTO_MARK') {
+      const { playerId } = payload;
+      const player = room.players[playerId];
+      if (player) {
+        const drawnSet = new Set(room.drawnBalls);
+        player.cardNumbers.forEach((row, r) => {
+          row.forEach((val, c) => {
+            if (val > 0 && drawnSet.has(val)) {
+              player.markedCells[r][c] = true;
+            }
+          });
+        });
+        this.saveAndBroadcast(room);
+      }
+    } else if (action === 'CHAT_MESSAGE') {
+      const { message } = payload;
+      if (message) {
+        room.chat.push(message);
+        if (room.chat.length > 80) room.chat = room.chat.slice(-80);
+        soundService.playChatPing();
+        this.saveAndBroadcast(room);
+      }
+    } else if (action === 'CLAIM_BINGO') {
+      const { playerId } = payload;
+      const player = room.players[playerId];
+      if (player && room.status === 'PLAYING' && !room.winner) {
+        const audit = checkVictory(
+          player.cardNumbers,
+          player.markedCells,
+          room.drawnBalls,
+          room.mode,
+          room.winningRule
+        );
+        if (audit.isWinner) {
+          room.status = 'FINISHED';
+          if (this.autoDrawTimer) clearInterval(this.autoDrawTimer);
+          room.winner = {
+            winnerId: player.id,
+            winnerName: player.name,
+            winnerAvatar: player.avatar,
+            winningPattern: audit.patternName,
+            verifiedBalls: room.drawnBalls,
+            timestamp: Date.now(),
+          };
+          room.chat.push({
+            id: 'bingo_' + Date.now(),
+            senderId: player.id,
+            senderName: player.name,
+            senderAvatar: player.avatar,
+            text: `🎉 BINGOOOO! ${player.name} venceu com "${audit.patternName}"!`,
+            timestamp: Date.now(),
+            isBingoCall: true,
+          });
+          soundService.playBingoFanfare();
+          fireBingoConfetti();
+        } else {
+          room.chat.push({
+            id: 'sys_' + Date.now(),
+            senderId: 'system',
+            senderName: 'Auditoria',
+            text: `⚠️ ${player.name} cantou bingo, mas ainda não completou os números válidos!`,
+            timestamp: Date.now(),
+            isSystem: true,
+          });
+        }
+        this.saveAndBroadcast(room);
+      }
+    }
+  }
+
+  // Join an existing room with code (works local & cross-device)
+  public async joinRoom(
     roomCode: string,
     playerName: string,
     avatar: string
-  ): { success: boolean; room?: RoomState; playerId?: string; error?: string } {
-    const room = this.findRoomByCode(roomCode);
-    if (!room) {
-      return { success: false, error: 'Código de sala não encontrado. Verifique e tente novamente.' };
+  ): Promise<{ success: boolean; room?: RoomState; playerId?: string; error?: string }> {
+    const cleanCode = roomCode.trim().toUpperCase();
+
+    // 1. Try local room first
+    const localRoom = this.findRoomByCode(cleanCode);
+    if (localRoom) {
+      const playerId = 'player_' + Math.random().toString(36).substring(2, 8);
+      const card = localRoom.mode === 'BINGO_75' ? generate75Card() : generate90Card();
+      const markedCells = card.map((row) => row.map(() => false));
+      if (localRoom.mode === 'BINGO_75') {
+        markedCells[2][2] = true;
+      }
+
+      const newPlayer: PlayerProfile = {
+        id: playerId,
+        name: playerName.trim() || 'Jogador ' + Math.floor(Math.random() * 100),
+        avatar: avatar || '🎲',
+        isHost: false,
+        themeId: 'neon_night',
+        markerId: 'stamp_glow',
+        cardNumbers: card,
+        markedCells,
+        joinedAt: Date.now(),
+      };
+
+      localRoom.players[playerId] = newPlayer;
+      localRoom.chat.push({
+        id: 'sys_' + Date.now(),
+        senderId: 'system',
+        senderName: 'Sistema',
+        text: `${newPlayer.avatar} ${newPlayer.name} entrou na sala!`,
+        timestamp: Date.now(),
+        isSystem: true,
+      });
+
+      this.currentRoomId = localRoom.id;
+      this.currentPlayerId = playerId;
+      this.saveAndBroadcast(localRoom);
+      soundService.playChatPing();
+
+      return { success: true, room: localRoom, playerId };
     }
 
-    const playerId = 'player_' + Math.random().toString(36).substring(2, 8);
-    const card = room.mode === 'BINGO_75' ? generate75Card() : generate90Card();
-    const markedCells = card.map((row) => row.map(() => false));
-    if (room.mode === 'BINGO_75') {
-      markedCells[2][2] = true;
+    // 2. Try Central Server API for instant cross-device connectivity
+    try {
+      const resp = await fetch(`/api/rooms/${cleanCode}`);
+      if (resp.ok) {
+        const serverRoom = (await resp.json()) as RoomState;
+        if (serverRoom && serverRoom.code === cleanCode) {
+          const playerId = 'player_' + Math.random().toString(36).substring(2, 8);
+          const card = serverRoom.mode === 'BINGO_75' ? generate75Card() : generate90Card();
+          const markedCells = card.map((row) => row.map(() => false));
+          if (serverRoom.mode === 'BINGO_75') {
+            markedCells[2][2] = true;
+          }
+
+          const guestProfile: PlayerProfile = {
+            id: playerId,
+            name: playerName.trim() || 'Jogador ' + Math.floor(Math.random() * 100),
+            avatar: avatar || '🎲',
+            isHost: false,
+            themeId: 'neon_night',
+            markerId: 'stamp_glow',
+            cardNumbers: card,
+            markedCells,
+            joinedAt: Date.now(),
+          };
+
+          // Register guest on server
+          await fetch(`/api/rooms/${cleanCode}/join`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ player: guestProfile }),
+          });
+
+          if (!serverRoom.players) serverRoom.players = {};
+          serverRoom.players[playerId] = guestProfile;
+
+          this.currentRoomId = serverRoom.id;
+          this.currentPlayerId = playerId;
+          localStorage.setItem(STORAGE_KEY_PREFIX + serverRoom.id, JSON.stringify(serverRoom));
+          this.handleIncomingRoom(serverRoom, false);
+          soundService.playChatPing();
+
+          // Start active polling to sync room state with host in real-time
+          this.startServerPolling(cleanCode);
+
+          return { success: true, room: serverRoom, playerId };
+        }
+      }
+    } catch {
+      // Fallback to PeerJS WebRTC
     }
 
-    const newPlayer: PlayerProfile = {
-      id: playerId,
-      name: playerName.trim() || 'Jogador ' + Math.floor(Math.random() * 100),
-      avatar: avatar || '👤',
-      isHost: false,
-      themeId: 'grafite_menta',
-      markerId: 'fill_solid',
-      cardNumbers: card,
-      markedCells,
-      joinedAt: Date.now(),
-    };
+    // 3. Fallback Cross-device WebRTC PeerJS Connection
+    return new Promise((resolve) => {
+      const hostPeerId = PEER_PREFIX + cleanCode;
+      const guestPeer = new Peer();
 
-    room.players[playerId] = newPlayer;
-    room.chat.push({
-      id: 'sys_' + Date.now(),
-      senderId: 'system',
-      senderName: 'Sistema',
-      text: `${newPlayer.avatar} ${newPlayer.name} entrou na sala!`,
-      timestamp: Date.now(),
-      isSystem: true,
+      const timeout = setTimeout(() => {
+        try {
+          guestPeer.destroy();
+        } catch {}
+        resolve({
+          success: false,
+          error: 'Código não encontrado ou o anfitrião está offline. Verifique o código e tente novamente.',
+        });
+      }, 7000);
+
+      guestPeer.on('open', () => {
+        const conn = guestPeer.connect(hostPeerId, { reliable: true });
+
+        conn.on('open', () => {
+          clearTimeout(timeout);
+          this.guestConnection = conn;
+          this.peer = guestPeer;
+
+          const playerId = 'player_' + Math.random().toString(36).substring(2, 8);
+
+          conn.on('data', (raw: unknown) => {
+            const data = raw as { type: string; room?: RoomState };
+            if (data && data.type === 'ROOM_UPDATE' && data.room) {
+              const remoteRoom = data.room;
+
+              // Check if our player is already in remoteRoom
+              if (!remoteRoom.players[playerId]) {
+                const card = remoteRoom.mode === 'BINGO_75' ? generate75Card() : generate90Card();
+                const marked = card.map((row) => row.map(() => false));
+                if (remoteRoom.mode === 'BINGO_75') marked[2][2] = true;
+
+                const guestProfile: PlayerProfile = {
+                  id: playerId,
+                  name: playerName.trim() || 'Jogador',
+                  avatar: avatar || '🎲',
+                  isHost: false,
+                  themeId: 'neon_night',
+                  markerId: 'stamp_glow',
+                  cardNumbers: card,
+                  markedCells: marked,
+                  joinedAt: Date.now(),
+                };
+
+                conn.send({
+                  type: 'GUEST_JOIN',
+                  payload: { guestPlayer: guestProfile },
+                });
+                remoteRoom.players[playerId] = guestProfile;
+              }
+
+              this.currentRoomId = remoteRoom.id;
+              this.currentPlayerId = playerId;
+              localStorage.setItem(STORAGE_KEY_PREFIX + remoteRoom.id, JSON.stringify(remoteRoom));
+              this.handleIncomingRoom(remoteRoom, false);
+              resolve({ success: true, room: remoteRoom, playerId });
+            }
+          });
+        });
+
+        conn.on('error', () => {
+          clearTimeout(timeout);
+          resolve({
+            success: false,
+            error: 'Não foi possível conectar à sala. Verifique se o anfitrião ainda está online.',
+          });
+        });
+      });
+
+      guestPeer.on('error', () => {
+        clearTimeout(timeout);
+        resolve({
+          success: false,
+          error: 'Código de sala inválido ou anfitrião desconectado.',
+        });
+      });
     });
-
-    this.currentRoomId = room.id;
-    this.currentPlayerId = playerId;
-    this.saveAndBroadcast(room);
-
-    soundService.playChatPing();
-
-    return { success: true, room, playerId };
   }
 
-  // Regenerate player card numbers before or during pregame
+  // Regenerate player card numbers
   public regenerateCard(themeId?: string, markerId?: string) {
     if (!this.currentRoomId || !this.currentPlayerId) return;
     const room = this.getRoom(this.currentRoomId);
@@ -268,7 +649,7 @@ class MultiplayerService {
     this.saveAndBroadcast(room);
   }
 
-  // Update visual theme / marker without changing numbers
+  // Update theme / marker without changing numbers
   public updateCustomization(themeId: string, markerId: string) {
     if (!this.currentRoomId || !this.currentPlayerId) return;
     const room = this.getRoom(this.currentRoomId);
@@ -288,24 +669,36 @@ class MultiplayerService {
     const room = this.getRoom(this.currentRoomId);
     if (!room) return;
 
+    // If we are guest on remote peer connection, forward action to host
+    if (this.guestConnection && this.guestConnection.open) {
+      this.guestConnection.send({
+        type: 'GUEST_ACTION',
+        payload: { action: 'TOGGLE_CELL', payload: { playerId: this.currentPlayerId, r, c } },
+      });
+    }
+
     const player = room.players[this.currentPlayerId];
     if (!player) return;
 
-    // Center free cell in 75 mode cannot be unmarked
     if (room.mode === 'BINGO_75' && r === 2 && c === 2) return;
 
-    // Toggle
     player.markedCells[r][c] = !player.markedCells[r][c];
     soundService.playMarkSound();
-
     this.saveAndBroadcast(room);
   }
 
-  // Auto-mark helper: mark all legitimately drawn numbers that are on this card
+  // Auto-mark helper
   public autoMarkDrawn() {
     if (!this.currentRoomId || !this.currentPlayerId) return;
     const room = this.getRoom(this.currentRoomId);
     if (!room) return;
+
+    if (this.guestConnection && this.guestConnection.open) {
+      this.guestConnection.send({
+        type: 'GUEST_ACTION',
+        payload: { action: 'AUTO_MARK', payload: { playerId: this.currentPlayerId } },
+      });
+    }
 
     const player = room.players[this.currentPlayerId];
     if (!player) return;
@@ -341,7 +734,6 @@ class MultiplayerService {
     room.previousBalls = [];
     room.winner = null;
 
-    // Clear marks on all players (except free space in 75)
     Object.values(room.players).forEach((p) => {
       p.markedCells = p.cardNumbers.map((row) => row.map(() => false));
       if (room.mode === 'BINGO_75') {
@@ -353,7 +745,7 @@ class MultiplayerService {
       id: 'sys_' + Date.now(),
       senderId: 'system',
       senderName: 'Sistema',
-      text: '🎱 O globo começou a girar! Boa sorte a todos!',
+      text: '🎱 O globo começou a rodar! Boa sorte aos jogadores!',
       timestamp: Date.now(),
       isSystem: true,
     });
@@ -375,7 +767,7 @@ class MultiplayerService {
         id: 'sys_' + Date.now(),
         senderId: 'system',
         senderName: 'Sistema',
-        text: '⏸️ O sorteio foi pausado pelo anfitrião.',
+        text: '⏸️ Sorteio pausado pelo anfitrião.',
         timestamp: Date.now(),
         isSystem: true,
       });
@@ -385,7 +777,7 @@ class MultiplayerService {
         id: 'sys_' + Date.now(),
         senderId: 'system',
         senderName: 'Sistema',
-        text: '▶️ O sorteio foi retomado!',
+        text: '▶️ Sorteio retomado!',
         timestamp: Date.now(),
         isSystem: true,
       });
@@ -413,7 +805,6 @@ class MultiplayerService {
     const maxBalls = room.mode === 'BINGO_75' ? 75 : 90;
     const drawnSet = new Set(room.drawnBalls);
 
-    // Remaining candidates
     const available: number[] = [];
     for (let i = 1; i <= maxBalls; i++) {
       if (!drawnSet.has(i)) available.push(i);
@@ -426,7 +817,7 @@ class MultiplayerService {
         id: 'sys_' + Date.now(),
         senderId: 'system',
         senderName: 'Sistema',
-        text: '🏁 Todas as pedras foram sorteadas! Fim de jogo.',
+        text: '🏁 Todas as pedras foram sorteadas! Fim da rodada.',
         timestamp: Date.now(),
         isSystem: true,
       });
@@ -436,12 +827,11 @@ class MultiplayerService {
 
     const nextBall = available[Math.floor(Math.random() * available.length)];
     if (room.currentBall !== null) {
-      room.previousBalls = [room.currentBall, ...room.previousBalls.slice(0, 7)];
+      room.previousBalls = [room.currentBall, ...room.previousBalls.slice(0, 9)];
     }
     room.currentBall = nextBall;
     room.drawnBalls.push(nextBall);
 
-    // Sound and voice
     soundService.playBallDrawnSound();
     if (room.mode === 'BINGO_75') {
       soundService.speakBall(nextBall, get75BallLetter(nextBall));
@@ -449,26 +839,167 @@ class MultiplayerService {
       soundService.speakBall(nextBall);
     }
 
+    // Auto-mark bot cards and check if a bot claims victory
+    let botWon = false;
+    Object.values(room.players).forEach((p) => {
+      if (p.isBot) {
+        p.cardNumbers.forEach((row, r) => {
+          row.forEach((val, c) => {
+            if (val === nextBall) {
+              p.markedCells[r][c] = true;
+            }
+          });
+        });
+
+        if (!room.winner && !botWon && room.status === 'PLAYING') {
+          const audit = checkVictory(
+            p.cardNumbers,
+            p.markedCells,
+            room.drawnBalls,
+            room.mode,
+            room.winningRule
+          );
+          if (audit.isWinner) {
+            botWon = true;
+            room.status = 'FINISHED';
+            if (this.autoDrawTimer) clearInterval(this.autoDrawTimer);
+            room.winner = {
+              winnerId: p.id,
+              winnerName: p.name,
+              winnerAvatar: p.avatar,
+              winningPattern: audit.patternName,
+              verifiedBalls: room.drawnBalls,
+              timestamp: Date.now(),
+            };
+            room.chat.push({
+              id: 'bingo_' + Date.now(),
+              senderId: p.id,
+              senderName: p.name,
+              senderAvatar: p.avatar,
+              text: `🎉🏆 BINGOOOO! ${p.name} gritou bingo com "${audit.patternName}"!`,
+              timestamp: Date.now(),
+              isBingoCall: true,
+            });
+            soundService.playBingoFanfare();
+            fireBingoConfetti();
+          }
+        }
+      }
+    });
+
+    this.saveAndBroadcast(room);
+    return true;
+  }
+
+  public addBotPlayer(): boolean {
+    if (!this.currentRoomId) return false;
+    const room = this.getRoom(this.currentRoomId);
+    if (!room || !this.isCurrentPlayerHost(room)) return false;
+
+    const BOT_PROFILES = [
+      { name: 'Mariana Sorte', avatar: '🍀', themeId: 'electric_mint', markerId: 'clover_lucky' },
+      { name: 'Lucas Fera', avatar: '🦁', themeId: 'royal_gold', markerId: 'star_neon' },
+      { name: 'Bia Campeã', avatar: '⭐', themeId: 'cyber_purple', markerId: 'heart_ruby' },
+      { name: 'Thiago 777', avatar: '💎', themeId: 'neon_night', markerId: 'chip_casino' },
+      { name: 'Renata Bingo', avatar: '🔥', themeId: 'royal_gold', markerId: 'fire_pulse' },
+      { name: 'Pedro Astral', avatar: '🚀', themeId: 'neon_night', markerId: 'stamp_glow' },
+    ];
+
+    const currentNames = new Set(Object.values(room.players).map((p) => p.name));
+    const available = BOT_PROFILES.filter((b) => !currentNames.has(b.name));
+    if (available.length === 0) return false;
+
+    const chosen = available[Math.floor(Math.random() * available.length)];
+    const botId = 'bot_' + Math.random().toString(36).substring(2, 7);
+    const card = room.mode === 'BINGO_75' ? generate75Card() : generate90Card();
+    const marked = card.map((row) => row.map(() => false));
+    if (room.mode === 'BINGO_75') marked[2][2] = true;
+
+    const botPlayer: PlayerProfile = {
+      id: botId,
+      name: chosen.name,
+      avatar: chosen.avatar,
+      isHost: false,
+      isBot: true,
+      themeId: chosen.themeId,
+      markerId: chosen.markerId,
+      cardNumbers: card,
+      markedCells: marked,
+      joinedAt: Date.now(),
+    };
+
+    room.players[botId] = botPlayer;
+    room.chat.push({
+      id: 'sys_' + Date.now(),
+      senderId: 'system',
+      senderName: 'Sistema',
+      text: `${botPlayer.avatar} ${botPlayer.name} (Convidado) sentou à mesa!`,
+      timestamp: Date.now(),
+      isSystem: true,
+    });
+
+    this.saveAndBroadcast(room);
+    soundService.playChatPing();
+    return true;
+  }
+
+  public removePlayer(playerId: string): boolean {
+    if (!this.currentRoomId) return false;
+    const room = this.getRoom(this.currentRoomId);
+    if (!room || !this.isCurrentPlayerHost(room)) return false;
+    if (room.hostId === playerId) return false;
+
+    const removed = room.players[playerId];
+    if (!removed) return false;
+
+    delete room.players[playerId];
+    room.chat.push({
+      id: 'sys_' + Date.now(),
+      senderId: 'system',
+      senderName: 'Sistema',
+      text: `${removed.avatar} ${removed.name} saiu da sala.`,
+      timestamp: Date.now(),
+      isSystem: true,
+    });
+
     this.saveAndBroadcast(room);
     return true;
   }
 
   private syncHostTimer(room: RoomState) {
+    if (room.status !== 'PLAYING' || room.winner) {
+      if (this.autoDrawTimer) {
+        clearInterval(this.autoDrawTimer);
+        this.autoDrawTimer = null;
+      }
+      this.lastTimerStatus = room.status;
+      return;
+    }
+
+    // Keep running if already active with same speed
+    if (this.autoDrawTimer && this.lastTimerSpeed === room.drawSpeedSeconds && this.lastTimerStatus === 'PLAYING') {
+      return;
+    }
+
     if (this.autoDrawTimer) {
       clearInterval(this.autoDrawTimer);
       this.autoDrawTimer = null;
     }
 
-    if (room.status === 'PLAYING' && !room.winner) {
-      this.autoDrawTimer = setInterval(() => {
-        const current = this.currentRoomId ? this.getRoom(this.currentRoomId) : null;
-        if (current && current.status === 'PLAYING' && !current.winner) {
-          this.drawNextBall();
-        } else {
-          if (this.autoDrawTimer) clearInterval(this.autoDrawTimer);
+    this.lastTimerSpeed = room.drawSpeedSeconds;
+    this.lastTimerStatus = room.status;
+
+    this.autoDrawTimer = setInterval(() => {
+      const current = this.currentRoomId ? this.getRoom(this.currentRoomId) : null;
+      if (current && current.status === 'PLAYING' && !current.winner) {
+        this.drawNextBall();
+      } else {
+        if (this.autoDrawTimer) {
+          clearInterval(this.autoDrawTimer);
+          this.autoDrawTimer = null;
         }
-      }, room.drawSpeedSeconds * 1000);
-    }
+      }
+    }, room.drawSpeedSeconds * 1000);
   }
 
   // Player claims BINGO
@@ -486,12 +1017,20 @@ class MultiplayerService {
       return { success: false, message: `O bingo já foi cantado por ${room.winner.winnerName}!` };
     }
 
+    // If guest on remote peer connection, forward claim to host
+    if (this.guestConnection && this.guestConnection.open) {
+      this.guestConnection.send({
+        type: 'GUEST_ACTION',
+        payload: { action: 'CLAIM_BINGO', payload: { playerId: this.currentPlayerId } },
+      });
+      return { success: true, message: 'Bingo cantado! Conferindo cartela com a mesa...' };
+    }
+
     const player = room.players[this.currentPlayerId];
     if (!player) {
       return { success: false, message: 'Jogador não encontrado.' };
     }
 
-    // STRICT AUDIT
     const audit = checkVictory(
       player.cardNumbers,
       player.markedCells,
@@ -501,23 +1040,21 @@ class MultiplayerService {
     );
 
     if (!audit.isWinner) {
-      // Invalid bingo call
       room.chat.push({
         id: 'sys_' + Date.now(),
         senderId: 'system',
         senderName: 'Auditoria',
-        text: `⚠️ ${player.avatar} ${player.name} cantou BINGO, mas a cartela ainda não completou os requisitos ou possui números não sorteados!`,
+        text: `⚠️ ${player.name} cantou BINGO, mas os números não atendem aos critérios de vitória!`,
         timestamp: Date.now(),
         isSystem: true,
       });
       this.saveAndBroadcast(room);
       return {
         success: false,
-        message: 'Bingo inválido! Verifique se todos os números marcados foram realmente sorteados.',
+        message: 'Bingo inválido! Verifique os números marcados na sua cartela.',
       };
     }
 
-    // VALID BINGO!
     room.status = 'FINISHED';
     if (this.autoDrawTimer) clearInterval(this.autoDrawTimer);
 
@@ -535,7 +1072,7 @@ class MultiplayerService {
       senderId: player.id,
       senderName: player.name,
       senderAvatar: player.avatar,
-      text: `🎉🏆 BINGOOOOOOOO! Vitória confirmada com "${audit.patternName}"!`,
+      text: `🎉🏆 BINGOOOO! Vitória confirmada com "${audit.patternName}"!`,
       timestamp: Date.now(),
       isBingoCall: true,
     });
@@ -544,7 +1081,7 @@ class MultiplayerService {
     fireBingoConfetti();
     this.saveAndBroadcast(room);
 
-    return { success: true, message: `Parabéns! Vitória auditada com ${audit.patternName}!` };
+    return { success: true, message: `BINGO! Parabéns pela vitória com ${audit.patternName}!` };
   }
 
   // Send chat message
@@ -569,8 +1106,14 @@ class MultiplayerService {
       timestamp: Date.now(),
     };
 
+    if (this.guestConnection && this.guestConnection.open) {
+      this.guestConnection.send({
+        type: 'GUEST_ACTION',
+        payload: { action: 'CHAT_MESSAGE', payload: { message: msg } },
+      });
+    }
+
     room.chat.push(msg);
-    // Keep max 80 messages
     if (room.chat.length > 80) {
       room.chat = room.chat.slice(-80);
     }
@@ -578,7 +1121,6 @@ class MultiplayerService {
     soundService.playChatPing();
     this.saveAndBroadcast(room);
   }
-
 
   // Restart / New Round
   public restartRound() {
@@ -594,7 +1136,6 @@ class MultiplayerService {
     room.currentBall = null;
     room.previousBalls = [];
 
-    // Give each player a fresh card
     Object.values(room.players).forEach((p) => {
       const card = room.mode === 'BINGO_75' ? generate75Card() : generate90Card();
       const marked = card.map((row) => row.map(() => false));
@@ -607,7 +1148,7 @@ class MultiplayerService {
       id: 'sys_' + Date.now(),
       senderId: 'system',
       senderName: 'Sistema',
-      text: '🔄 Nova rodada configurada! Preparem suas cartelas.',
+      text: '🔄 Nova rodada configurada! Cartelas renovadas.',
       timestamp: Date.now(),
       isSystem: true,
     });
@@ -615,11 +1156,57 @@ class MultiplayerService {
     this.saveAndBroadcast(room);
   }
 
+  private startServerPolling(code: string) {
+    if (this.serverPollTimer) clearInterval(this.serverPollTimer);
+    this.serverPollTimer = setInterval(async () => {
+      if (!this.currentRoomId) {
+        if (this.serverPollTimer) {
+          clearInterval(this.serverPollTimer);
+          this.serverPollTimer = null;
+        }
+        return;
+      }
+      try {
+        const res = await fetch(`/api/rooms/${code}`);
+        if (res.ok) {
+          const updated = (await res.json()) as RoomState;
+          if (updated && updated.id === this.currentRoomId) {
+            this.handleIncomingRoom(updated, false);
+          }
+        }
+      } catch {
+        // ignore network hiccups
+      }
+    }, 1500);
+  }
+
   // Leave room
   public leaveRoom() {
     if (this.autoDrawTimer) {
       clearInterval(this.autoDrawTimer);
       this.autoDrawTimer = null;
+    }
+    if (this.serverPollTimer) {
+      clearInterval(this.serverPollTimer);
+      this.serverPollTimer = null;
+    }
+    if (this.guestConnection) {
+      try {
+        this.guestConnection.close();
+      } catch {}
+      this.guestConnection = null;
+    }
+    this.hostConnections.forEach((conn) => {
+      try {
+        conn.close();
+      } catch {}
+    });
+    this.hostConnections.clear();
+    if (this.peer) {
+      try {
+        this.peer.destroy();
+      } catch {}
+      this.peer = null;
     }
     this.currentRoomId = null;
     this.currentPlayerId = null;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Volume2, VolumeX, Mic, MicOff, Palette, Grid3X3, LogOut, Sliders } from 'lucide-react';
+import { Volume2, VolumeX, Mic, MicOff, Palette, Grid3X3, LogOut, Sparkles } from 'lucide-react';
 
 interface NavbarProps {
   roomCode?: string;
@@ -25,66 +25,70 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleSpeech,
 }) => {
   return (
-    <header className="sticky top-0 z-40 bg-[#121316]/95 backdrop-blur-md border-b border-zinc-800/80 px-4 md:px-8 py-3 flex items-center justify-between gap-8 transition-all">
+    <header className="sticky top-0 z-40 bg-slate-950/75 backdrop-blur-2xl border-b border-white/10 px-4 md:px-8 py-3.5 flex items-center justify-between gap-8 transition-all">
       {/* Zone 1: Brand Wordmark */}
       <div className="flex items-center gap-3 shrink-0">
-        <a href="/" className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-md bg-zinc-800 border border-zinc-700/80 flex items-center justify-center text-zinc-100 font-bold text-xs font-mono">
+        <a href="/" className="flex items-center gap-2.5 group">
+          <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-amber-400 via-orange-500 to-amber-300 flex items-center justify-center text-slate-950 font-black text-sm font-game shadow-lg shadow-amber-500/25 group-hover:scale-105 transition-transform duration-300">
             B
           </div>
-          <span className="text-base font-semibold tracking-tight text-zinc-100 whitespace-nowrap">
+          <span className="text-lg font-black tracking-tight text-white font-display whitespace-nowrap">
             Bingo Club
           </span>
         </a>
         {roomCode && (
-          <div className="hidden sm:flex items-center gap-2 pl-3 border-l border-zinc-800 text-xs text-zinc-400">
-            <span>Sala</span>
-            <span className="font-mono font-semibold text-zinc-200 bg-zinc-850 px-2 py-0.5 rounded border border-zinc-700/60 tabular-nums">
+          <div className="hidden sm:flex items-center gap-2 pl-3 border-l border-white/10 text-xs">
+            <span className="text-slate-400 font-display">Sala</span>
+            <span className="font-mono font-bold text-amber-400 bg-amber-400/10 px-2.5 py-0.5 rounded-lg border border-amber-400/20 tabular-nums shadow-sm">
               {roomCode}
             </span>
-            <span className="text-zinc-600">·</span>
-            <span className="text-zinc-400">{roomMode === 'BINGO_75' ? '75 Bolas' : '90 Bolas'}</span>
+            <span className="text-slate-600">·</span>
+            <span className="text-cyan-400 font-semibold">{roomMode === 'BINGO_75' ? '75 Bolas' : '90 Bolas'}</span>
           </div>
         )}
       </div>
 
-      {/* Zone 2: Navigation & Controls */}
-      <nav className="hidden md:flex items-center gap-5 text-xs font-medium text-zinc-400">
+      {/* Zone 2: Navigation & Tools */}
+      <nav className="hidden md:flex items-center gap-4 text-xs font-bold font-display text-slate-300">
         <button
           onClick={onOpenCustomizer}
-          className="flex items-center gap-1.5 hover:text-zinc-200 transition-colors whitespace-nowrap shrink-0 py-1"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl hover:text-white hover:bg-white/[0.08] transition-all whitespace-nowrap cursor-pointer"
         >
-          <Palette className="w-3.5 h-3.5 text-zinc-400" />
-          <span>Visual da Cartela</span>
+          <Palette className="w-4 h-4 text-cyan-400" />
+          <span>Personalizar</span>
         </button>
 
         <button
           onClick={onOpenBoard}
-          className="flex items-center gap-1.5 hover:text-zinc-200 transition-colors whitespace-nowrap shrink-0 py-1"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl hover:text-white hover:bg-white/[0.08] transition-all whitespace-nowrap cursor-pointer"
         >
-          <Grid3X3 className="w-3.5 h-3.5 text-zinc-400" />
-          <span>Quadro de Pedras</span>
+          <Grid3X3 className="w-4 h-4 text-amber-400" />
+          <span>Quadro Geral</span>
         </button>
 
-        <div className="flex items-center gap-1.5 pl-3 border-l border-zinc-800">
+        <div className="flex items-center gap-1.5 pl-3 border-l border-white/10">
           <button
             onClick={onToggleSpeech}
             title={speechActive ? 'Voz de locução ativada' : 'Voz de locução desativada'}
-            className={`p-1.5 rounded-md transition-colors ${
-              speechActive ? 'text-emerald-400 bg-emerald-500/10' : 'text-zinc-500 hover:text-zinc-300'
+            className={`p-2 rounded-xl transition-all cursor-pointer ${
+              speechActive
+                ? 'text-amber-400 bg-amber-500/10 border border-amber-500/30 shadow-[0_0_10px_rgba(245,158,11,0.2)]'
+                : 'text-slate-500 hover:text-slate-300 bg-white/[0.04]'
             }`}
           >
-            {speechActive ? <Mic className="w-3.5 h-3.5" /> : <MicOff className="w-3.5 h-3.5" />}
+            {speechActive ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
           </button>
 
           <button
             onClick={onToggleSfx}
             title={sfxActive ? 'Efeitos sonoros ativados' : 'Efeitos sonoros desativados'}
-            className={`p-1.5 rounded-md transition-colors ${
-              sfxActive ? 'text-emerald-400 bg-emerald-500/10' : 'text-zinc-500 hover:text-zinc-300'
+            className={`p-2 rounded-xl transition-all cursor-pointer ${
+              sfxActive
+                ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.2)]'
+                : 'text-slate-500 hover:text-slate-300 bg-white/[0.04]'
             }`}
           >
-            {sfxActive ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+            {sfxActive ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
           </button>
         </div>
       </nav>
@@ -94,14 +98,14 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="flex md:hidden items-center gap-1 mr-1">
           <button
             onClick={onOpenCustomizer}
-            className="p-1.5 text-zinc-400 hover:text-zinc-200 rounded-md"
+            className="p-2 text-cyan-400 hover:bg-white/[0.08] rounded-xl"
             title="Personalizar"
           >
             <Palette className="w-4 h-4" />
           </button>
           <button
             onClick={onOpenBoard}
-            className="p-1.5 text-zinc-400 hover:text-zinc-200 rounded-md"
+            className="p-2 text-amber-400 hover:bg-white/[0.08] rounded-xl"
             title="Quadro Geral"
           >
             <Grid3X3 className="w-4 h-4" />
@@ -111,18 +115,18 @@ export const Navbar: React.FC<NavbarProps> = ({
         {onLeaveRoom ? (
           <button
             onClick={onLeaveRoom}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-300 bg-zinc-800/80 border border-zinc-700/60 rounded-md hover:bg-zinc-800 hover:text-white transition-colors whitespace-nowrap shrink-0"
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold font-display text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded-xl hover:bg-rose-500/20 hover:text-white transition-all whitespace-nowrap cursor-pointer"
           >
-            <LogOut className="w-3 h-3 text-red-400" />
+            <LogOut className="w-3.5 h-3.5" />
             <span>Sair</span>
           </button>
         ) : (
           <button
             onClick={onOpenCustomizer}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-zinc-950 bg-emerald-500 hover:bg-emerald-400 rounded-md transition-colors whitespace-nowrap shrink-0 shadow-sm"
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-black font-display uppercase tracking-wider text-slate-950 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 rounded-xl transition-all duration-300 whitespace-nowrap shadow-lg shadow-amber-500/20 cursor-pointer active:scale-95"
           >
-            <Sliders className="w-3.5 h-3.5" />
-            <span>Preferências</span>
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Minha Cartela</span>
           </button>
         )}
       </div>
