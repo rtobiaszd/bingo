@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { RoomState, BingoMode, WinningRule } from './types/bingo';
+import { RoomState, BingoMode, WinningRule, RegisteredPlayer, PrizeItem } from './types/bingo';
 import { multiplayerService } from './services/multiplayerService';
 import { soundService } from './services/soundService';
 import { CARD_THEMES, MARKER_STYLES } from './utils/themes';
@@ -18,8 +18,11 @@ import { ChatPanel } from './components/ChatPanel';
 import { CustomizerModal } from './components/CustomizerModal';
 import { BallBoardModal } from './components/BallBoardModal';
 import { WinnerCelebrationModal } from './components/WinnerCelebrationModal';
+import { PlayerRegistrationModal } from './components/PlayerRegistrationModal';
+import { PrizeShowcaseModal } from './components/PrizeShowcaseModal';
+import { AdminDashboardModal } from './components/AdminDashboardModal';
 import { OfflineIndicator } from './components/OfflineIndicator';
-import { AlertCircle, CheckCircle, Info } from 'lucide-react';
+import { AlertCircle, CheckCircle, Info, Gift } from 'lucide-react';
 
 export default function App() {
   const [room, setRoom] = useState<RoomState | null>(null);
@@ -30,6 +33,9 @@ export default function App() {
   const [isCustomizerOpen, setIsCustomizerOpen] = useState(false);
   const [isBoardOpen, setIsBoardOpen] = useState(false);
   const [isWinnerDismissed, setIsWinnerDismissed] = useState(false);
+  const [isPlayerRegOpen, setIsPlayerRegOpen] = useState(false);
+  const [isPrizeShowcaseOpen, setIsPrizeShowcaseOpen] = useState(false);
+  const [isAdminDashboardOpen, setIsAdminDashboardOpen] = useState(false);
 
   // Audio toggles
   const [sfxActive, setSfxActive] = useState(true);
@@ -93,7 +99,9 @@ export default function App() {
     rule: WinningRule,
     speed: number,
     isPrivate: boolean = false,
-    roomName?: string
+    roomName?: string,
+    prizeTitle?: string,
+    prizeImageUrl?: string
   ) => {
     const { room: newRoom, playerId } = multiplayerService.createRoom(
       hostName,
@@ -102,7 +110,9 @@ export default function App() {
       rule,
       speed,
       isPrivate,
-      roomName
+      roomName,
+      prizeTitle,
+      prizeImageUrl
     );
     setRoom(newRoom);
     setCurrentPlayerId(playerId);
@@ -211,6 +221,10 @@ export default function App() {
     showToast('Novos números gerados para sua cartela!', 'info');
   };
 
+  const handlePlayerRegistered = (player: RegisteredPlayer) => {
+    showToast(`Bem-vindo ao clube, ${player.nickname}! Perfil cadastrado com sucesso.`, 'success');
+  };
+
   // Active player in current room
   const currentPlayer =
     room && currentPlayerId ? room.players[currentPlayerId] : null;
@@ -257,6 +271,9 @@ export default function App() {
         onOpenCustomizer={() => setIsCustomizerOpen(true)}
         onOpenBoard={() => setIsBoardOpen(true)}
         onLeaveRoom={room ? handleLeaveRoom : undefined}
+        onOpenAdminDashboard={() => setIsAdminDashboardOpen(true)}
+        onOpenRegisterModal={() => setIsPlayerRegOpen(true)}
+        onOpenPrizesModal={() => setIsPrizeShowcaseOpen(true)}
         sfxActive={sfxActive}
         speechActive={speechActive}
         onToggleSfx={handleToggleSfx}
@@ -264,13 +281,15 @@ export default function App() {
       />
 
       {/* Main View Area */}
-      <main className="flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 md:p-8 flex flex-col justify-start relative z-10">
+      <main className="flex-1 w-full max-w-7xl mx-auto p-3 sm:p-5 md:p-8 flex flex-col justify-start relative z-10">
         {!room ? (
           /* Zero-State: Lobby View */
           <LobbyView
             onCreateRoom={handleCreateRoom}
             onJoinRoom={handleJoinRoom}
             initialCode={initialRoomCode}
+            onOpenRegisterModal={() => setIsPlayerRegOpen(true)}
+            onOpenPrizesModal={() => setIsPrizeShowcaseOpen(true)}
           />
         ) : room.status === 'WAITING' ? (
           /* Pre-Game: Waiting Room View */
@@ -285,7 +304,7 @@ export default function App() {
           />
         ) : (
           /* Live Game Table View */
-          <div className="w-full space-y-6">
+          <div className="w-full space-y-5">
             {/* Host floating / embedded management controls */}
             {isHost && (
               <HostControls
@@ -297,6 +316,37 @@ export default function App() {
                 onRestartRound={handleRestartRound}
                 onAddBot={handleAddBot}
               />
+            )}
+
+            {/* Room Prize In-Game Sticky Badge */}
+            {room.prizeTitle && (
+              <div className="bg-gradient-to-r from-amber-500/15 via-yellow-500/10 to-orange-500/10 border border-amber-400/30 rounded-2xl p-2.5 px-4 flex items-center justify-between gap-3 shadow-md">
+                <div className="flex items-center gap-3">
+                  {room.prizeImageUrl && (
+                    <img
+                      src={room.prizeImageUrl}
+                      alt={room.prizeTitle}
+                      className="w-10 h-10 rounded-xl object-cover border border-amber-400/40 shadow-sm shrink-0"
+                    />
+                  )}
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-amber-400 font-mono tracking-wider">
+                      🎁 PRÊMIO EM DISPUTA
+                    </span>
+                    <p className="text-xs font-black text-white font-display truncate">
+                      {room.prizeTitle}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setIsPrizeShowcaseOpen(true)}
+                  className="px-3 py-1 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/30 text-amber-300 text-xs font-bold font-display shrink-0 transition-all flex items-center gap-1.5"
+                >
+                  <Gift className="w-3.5 h-3.5" />
+                  <span>Ver Prêmio</span>
+                </button>
+              </div>
             )}
 
             {/* Ball Spinner & Last Calls HUD */}
@@ -345,8 +395,14 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="w-full border-t border-white/10 py-5 px-6 text-center text-xs text-slate-400 font-display relative z-10 bg-slate-950/60 backdrop-blur-md">
-        <span>Bingo Real-Time Club · Salas Privadas · 75 & 90 Bolas · Locução e Sorteio Sincronizado</span>
+      <footer className="w-full border-t border-white/10 py-5 px-6 text-center text-xs text-slate-400 font-display relative z-10 bg-slate-950/60 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-3 max-w-7xl mx-auto">
+        <span>Bingo Real-Time Club · Salas Privadas & Abertas · Cadastro de Jogadores · Prêmios</span>
+        <button
+          onClick={() => setIsPlayerRegOpen(true)}
+          className="text-amber-400 hover:text-amber-300 font-bold underline transition-colors"
+        >
+          Cadastre seu Perfil de Jogador
+        </button>
       </footer>
 
       {/* Modal: Customizer */}
@@ -375,10 +431,33 @@ export default function App() {
         <WinnerCelebrationModal
           winner={room.winner}
           isHost={isHost}
+          prizeTitle={room.prizeTitle}
+          prizeImageUrl={room.prizeImageUrl}
           onRestartRound={handleRestartRound}
           onClose={() => setIsWinnerDismissed(true)}
         />
       )}
+
+      {/* Modal: Cadastro de Jogadores / Novos Usuários */}
+      <PlayerRegistrationModal
+        isOpen={isPlayerRegOpen}
+        onClose={() => setIsPlayerRegOpen(false)}
+        onPlayerRegistered={handlePlayerRegistered}
+      />
+
+      {/* Modal: Galeria de Prêmios com Fotos Reais */}
+      <PrizeShowcaseModal
+        isOpen={isPrizeShowcaseOpen}
+        onClose={() => setIsPrizeShowcaseOpen(false)}
+        isHostOrAdmin={isHost}
+      />
+
+      {/* Modal: Painel Master Admin Exclusivo para sb4fun88@gmail.com */}
+      <AdminDashboardModal
+        isOpen={isAdminDashboardOpen}
+        onClose={() => setIsAdminDashboardOpen(false)}
+        currentRoomId={room?.id}
+      />
 
       {/* Network Connectivity Status Indicator for PWA */}
       <OfflineIndicator />

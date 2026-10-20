@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { BingoMode, WinningRule, PublicRoomSummary } from '../types/bingo';
+import { BingoMode, WinningRule, PublicRoomSummary, PrizeItem } from '../types/bingo';
 import { AVATARS } from '../utils/themes';
+import { DEFAULT_PRIZES } from '../utils/prizes';
 import {
   KeyRound,
   HelpCircle,
@@ -16,6 +17,8 @@ import {
   ArrowRight,
   ShieldCheck,
   Zap,
+  Gift,
+  UserPlus,
 } from 'lucide-react';
 import { multiplayerService } from '../services/multiplayerService';
 import { PWAInstallButton } from './PWAInstallButton';
@@ -28,11 +31,15 @@ interface LobbyViewProps {
     rule: WinningRule,
     speed: number,
     isPrivate?: boolean,
-    roomName?: string
+    roomName?: string,
+    prizeTitle?: string,
+    prizeImageUrl?: string
   ) => void;
   onJoinRoom: (code: string, playerName: string, avatar: string) => Promise<void> | void;
   initialCode?: string;
   isConnecting?: boolean;
+  onOpenRegisterModal?: () => void;
+  onOpenPrizesModal?: () => void;
 }
 
 export const LobbyView: React.FC<LobbyViewProps> = ({
@@ -40,6 +47,8 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
   onJoinRoom,
   initialCode,
   isConnecting = false,
+  onOpenRegisterModal,
+  onOpenPrizesModal,
 }) => {
   const [activeTab, setActiveTab] = useState<'openRooms' | 'create' | 'join' | 'rules'>(
     initialCode ? 'join' : 'openRooms'
@@ -55,6 +64,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
   const [mode, setMode] = useState<BingoMode>('BINGO_75');
   const [winningRule, setWinningRule] = useState<WinningRule>('ANY');
   const [speed, setSpeed] = useState<number>(4);
+  const [selectedPrize, setSelectedPrize] = useState<PrizeItem>(DEFAULT_PRIZES[0]);
 
   // Join room states
   const [joinCode, setJoinCode] = useState(initialCode || '');
@@ -120,7 +130,9 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
       winningRule,
       speed,
       isPrivate,
-      customRoomName.trim() || undefined
+      customRoomName.trim() || undefined,
+      selectedPrize.title,
+      selectedPrize.imageUrl
     );
   };
 
@@ -220,7 +232,29 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
             <span>Entrar com Código</span>
           </button>
 
-          {/* Tab 4: Regras */}
+          {/* Tab 4: Prêmios */}
+          {onOpenPrizesModal && (
+            <button
+              onClick={onOpenPrizesModal}
+              className="flex items-center gap-1.5 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-[11px] sm:text-xs font-black uppercase tracking-wider font-display text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-400/30 transition-all cursor-pointer flex-1 sm:flex-initial justify-center"
+            >
+              <Gift className="w-4 h-4 text-amber-400 animate-pulse" />
+              <span>Prêmios</span>
+            </button>
+          )}
+
+          {/* Tab 5: Cadastro / Jogadores */}
+          {onOpenRegisterModal && (
+            <button
+              onClick={onOpenRegisterModal}
+              className="flex items-center gap-1.5 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-[11px] sm:text-xs font-black uppercase tracking-wider font-display text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-400/30 transition-all cursor-pointer flex-1 sm:flex-initial justify-center"
+            >
+              <Users className="w-4 h-4 text-emerald-400" />
+              <span>Jogadores</span>
+            </button>
+          )}
+
+          {/* Tab 6: Regras */}
           <button
             onClick={() => {
               setActiveTab('rules');
@@ -292,6 +326,18 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
             </div>
           </div>
         </div>
+
+        {onOpenRegisterModal && (
+          <button
+            type="button"
+            onClick={onOpenRegisterModal}
+            className="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-xs font-bold font-display flex items-center justify-center gap-1.5 transition-all shadow-sm shrink-0 cursor-pointer active:scale-95"
+            title="Abrir cadastro completo de jogador"
+          >
+            <UserPlus className="w-3.5 h-3.5" />
+            <span>Meu Cadastro</span>
+          </button>
+        )}
       </div>
 
       {/* ========================================================================= */}
@@ -414,6 +460,31 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
                           <span>{room.drawSpeedSeconds}s/bola</span>
                         </div>
                       </div>
+
+                      {/* Prize Thumbnail & Title Banner */}
+                      {room.prizeTitle && (
+                        <div className="flex items-center gap-2.5 p-2 rounded-xl bg-gradient-to-r from-amber-500/15 via-yellow-500/10 to-transparent border border-amber-400/30 mb-2">
+                          {room.prizeImageUrl ? (
+                            <img
+                              src={room.prizeImageUrl}
+                              alt={room.prizeTitle}
+                              className="w-9 h-9 rounded-lg object-cover border border-amber-400/40 shrink-0"
+                            />
+                          ) : (
+                            <div className="w-9 h-9 rounded-lg bg-amber-400/20 text-amber-300 flex items-center justify-center shrink-0">
+                              <Gift className="w-4 h-4" />
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <span className="text-[9px] uppercase font-bold text-amber-400 font-mono block">
+                              Prêmio em Disputa
+                            </span>
+                            <p className="text-xs font-black text-white truncate font-display">
+                              {room.prizeTitle}
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Footer Row: Code info & Direct Join Button */}
@@ -671,6 +742,51 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
               <span>Rápido (3s)</span>
               <span>Padrão (4-5s)</span>
               <span>Tranquilo (10s)</span>
+            </div>
+          </div>
+
+          {/* Room Prize Selector with Real Images */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-black text-amber-300 uppercase tracking-widest font-display flex items-center gap-1.5">
+                <Gift className="w-4 h-4 text-amber-400" />
+                <span>Prêmio em Disputa na Mesa</span>
+              </label>
+              <span className="text-[11px] text-slate-400 font-display">
+                Exibido com foto na sala e no BINGO!
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              {DEFAULT_PRIZES.slice(0, 4).map((prize) => {
+                const isSelected = selectedPrize.id === prize.id;
+                return (
+                  <button
+                    key={prize.id}
+                    type="button"
+                    onClick={() => setSelectedPrize(prize)}
+                    className={`p-2 rounded-2xl border text-left flex flex-col justify-between gap-2 transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-amber-500/20 border-amber-400 shadow-md shadow-amber-500/20 ring-1 ring-amber-400'
+                        : 'bg-white/[0.04] border-white/10 hover:bg-white/[0.08]'
+                    }`}
+                  >
+                    <img
+                      src={prize.imageUrl}
+                      alt={prize.title}
+                      className="w-full h-16 rounded-xl object-cover"
+                    />
+                    <div>
+                      <p className="text-[11px] font-bold text-white truncate font-display">
+                        {prize.title}
+                      </p>
+                      <p className="text-[10px] text-amber-300 font-mono font-bold">
+                        {prize.estimatedValue}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 

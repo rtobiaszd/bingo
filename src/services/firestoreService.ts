@@ -14,7 +14,8 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { RoomState, BingoCard, PlayerProfile, ChatMessage, PublicRoomSummary } from '../types/bingo';
+import { RoomState, BingoCard, PlayerProfile, ChatMessage, PublicRoomSummary, RegisteredPlayer, PrizeItem } from '../types/bingo';
+import { DEFAULT_PRIZES } from '../utils/prizes';
 
 export interface FirestorePlayerCard {
   id: string;
@@ -223,12 +224,17 @@ export const firestoreService = {
         winningRule: data.winningRule,
         drawnBalls: data.drawnBalls || [],
         currentBall: data.currentBall,
-        players: [],
-        messages: [],
+        players: {},
+        previousBalls: [],
+        chat: [],
+        winner: null,
+        startedAt: null,
         winnerId: data.winnerId,
         winnerName: data.winnerName,
         isPrivate: data.isPrivate,
         maxPlayers: data.maxPlayers,
+        prizeTitle: data.prizeTitle,
+        prizeImageUrl: data.prizeImageUrl,
         createdAt: data.createdAt ? new Date(data.createdAt).getTime() : Date.now(),
       };
     } catch (error) {
@@ -264,6 +270,10 @@ export const firestoreService = {
           maxPlayers: data.maxPlayers || 50,
           status: data.status,
           isPrivate: false,
+          winningRule: data.winningRule || 'ANY',
+          drawSpeedSeconds: data.drawSpeedSeconds || 4,
+          prizeTitle: data.prizeTitle,
+          prizeImageUrl: data.prizeImageUrl,
           createdAt: data.createdAt ? new Date(data.createdAt).getTime() : Date.now(),
         });
       }
@@ -428,5 +438,167 @@ export const firestoreService = {
         handleFirestoreError(error, OperationType.GET, `rooms/${roomId}/messages`);
       }
     );
+  },
+
+  /**
+   * ==========================================
+   * CADASTRO DE JOGADORES / NOVOS USUÁRIOS
+   * ==========================================
+   */
+
+  /**
+   * Registra ou atualiza um jogador no Firestore (/players/{playerId})
+   */
+  async registerPlayer(player: RegisteredPlayer): Promise<void> {
+    const playerRef = doc(db, 'players', player.id);
+    try {
+      await setDoc(
+        playerRef,
+        {
+          id: player.id,
+          name: player.name,
+          nickname: player.nickname,
+          avatar: player.avatar,
+          email: player.email || '',
+          phone: player.phone || '',
+          city: player.city || '',
+          luckyNumber: player.luckyNumber || null,
+          gamesPlayed: player.gamesPlayed || 0,
+          bingoWins: player.bingoWins || 0,
+          registeredAt: player.registeredAt || new Date().toISOString(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      // Também salvar no localStorage para acesso offline/rápido
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('bingo_current_player', JSON.stringify(player));
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `players/${player.id}`);
+    }
+  },
+
+  /**
+   * Busca a lista de jogadores cadastrados
+   */
+  async fetchRegisteredPlayers(): Promise<RegisteredPlayer[]> {
+    const playersCol = collection(db, 'players');
+    try {
+      const snap = await getDocs(playersCol);
+      return snap.docs.map((d) => d.data() as RegisteredPlayer);
+    } catch (error) {
+      console.warn('Erro ao buscar jogadores cadastrados do Firestore:', error);
+      return [];
+    }
+  },
+
+  /**
+   * Escuta em tempo real a lista de jogadores cadastrados no clube (suporta 10, 20, 100+ jogadores)
+   */
+  subscribeToRegisteredPlayers(callback: (players: RegisteredPlayer[]) => void): () => void {
+    const playersCol = collection(db, 'players');
+    const q = query(playersCol, limit(150));
+    return onSnapshot(
+      q,
+      (snap) => {
+        const players: RegisteredPlayer[] = snap.docs.map((d) => d.data() as RegisteredPlayer);
+        // Ordenar por vitórias ou data de registro
+        players.sort((a, b) => (b.bingoWins || 0) - (a.bingoWins || 0));
+        callback(players);
+      },
+      (error) => {
+        console.warn('Listener de jogadores do Firestore:', error);
+      }
+    );
+  },
+
+  /**
+   * Incrementa estatísticas do jogador (partidas jogadas e vitórias)
+   */
+  async incrementPlayerStats(playerId: string, won: boolean = false): Promise<void> {
+    const playerRef = doc(db, 'players', playerId);
+    try {
+      const snap = await getDoc(playerRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        await updateDoc(playerRef, {
+          gamesPlayed: (data.gamesPlayed || 0) + 1,
+          bingoWins: won ? (data.bingoWins || 0) + 1 : data.bingoWins || 0,
+          updatedAt: serverTimestamp(),
+        });
+      }
+    } catch (err) {
+      console.warn('Não foi possível atualizar stats do jogador:', err);
+    }
+  },
+
+  /**
+   * ==========================================
+   * CATÁLOGO DE IMAGENS E PRÊMIOS
+   * ==========================================
+   */
+
+  /**
+   * Busca prêmios cadastrados
+   */
+  async fetchPrizes(): Promise<PrizeItem[]> {
+    const prizesCol = collection(db, 'prizes');
+    try {
+      const snap = await getDocs(prizesCol);
+      if (snap.empty) {
+        return DEFAULT_PRIZES;
+      }
+      return snap.docs.map((d) => d.data() as PrizeItem);
+    } catch (error) {
+      console.warn('Erro ao carregar prêmios do Firestore, usando catálogo padrão:', error);
+      return DEFAULT_PRIZES;
+    }
+  },
+
+  /**
+   * Escuta os prêmios em tempo real
+   */
+  subscribeToPrizes(callback: (prizes: PrizeItem[]) => void): () => void {
+    const prizesCol = collection(db, 'prizes');
+    return onSnapshot(
+      prizesCol,
+      (snap) => {
+        if (snap.empty) {
+          callback(DEFAULT_PRIZES);
+        } else {
+          callback(snap.docs.map((d) => d.data() as PrizeItem));
+        }
+      },
+      (error) => {
+        console.warn('Listener de prêmios:', error);
+        callback(DEFAULT_PRIZES);
+      }
+    );
+  },
+
+  /**
+   * Cadastra ou atualiza um prêmio no catálogo
+   */
+  async savePrize(prize: PrizeItem): Promise<void> {
+    const prizeRef = doc(db, 'prizes', prize.id);
+    try {
+      await setDoc(prizeRef, prize, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `prizes/${prize.id}`);
+    }
+  },
+
+  /**
+   * Exclui um prêmio
+   */
+  async deletePrize(prizeId: string): Promise<void> {
+    const prizeRef = doc(db, 'prizes', prizeId);
+    try {
+      await deleteDoc(prizeRef);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `prizes/${prizeId}`);
+    }
   },
 };

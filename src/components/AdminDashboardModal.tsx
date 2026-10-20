@@ -22,11 +22,23 @@ import {
   Clock,
   Layers,
   ChevronRight,
+  Gift,
+  UserPlus,
+  Phone,
+  Mail,
+  MapPin,
+  Hash,
+  Plus,
+  Download,
+  Tag,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { firestoreService, FirestorePlayerCard } from '../services/firestoreService';
 import { MASTER_ADMIN_EMAIL } from '../lib/firebase';
 import { get75BallLetter } from '../utils/bingoRules';
+import { RegisteredPlayer, PrizeItem } from '../types/bingo';
+import { DEFAULT_PRIZES } from '../utils/prizes';
+import { AVATARS } from '../utils/themes';
 
 interface AdminDashboardModalProps {
   isOpen: boolean;
@@ -40,6 +52,9 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
   currentRoomId,
 }) => {
   const { user, isMasterAdmin, signInWithGoogle } = useAuth();
+  const [adminTab, setAdminTab] = useState<'rooms' | 'players' | 'prizes'>('rooms');
+
+  // Rooms & Cards State
   const [allRooms, setAllRooms] = useState<any[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<string>(currentRoomId || '');
   const [roomCards, setRoomCards] = useState<FirestorePlayerCard[]>([]);
@@ -47,6 +62,28 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
   const [filterSearch, setFilterSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'WAITING' | 'PLAYING' | 'FINISHED'>('ALL');
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+
+  // Registered Players Directory State (10, 20, 100+ players)
+  const [registeredPlayers, setRegisteredPlayers] = useState<RegisteredPlayer[]>([]);
+  const [playerSearch, setPlayerSearch] = useState('');
+  const [isAddingPlayer, setIsAddingPlayer] = useState(false);
+  const [newPlayerName, setNewPlayerName] = useState('');
+  const [newPlayerNick, setNewPlayerNick] = useState('');
+  const [newPlayerEmail, setNewPlayerEmail] = useState('');
+  const [newPlayerPhone, setNewPlayerPhone] = useState('');
+  const [newPlayerCity, setNewPlayerCity] = useState('');
+  const [newPlayerLuckyNumber, setNewPlayerLuckyNumber] = useState<number>(7);
+  const [newPlayerAvatar, setNewPlayerAvatar] = useState('👑');
+
+  // Prizes State
+  const [prizesList, setPrizesList] = useState<PrizeItem[]>(DEFAULT_PRIZES);
+  const [isAddingPrize, setIsAddingPrize] = useState(false);
+  const [newPrizeTitle, setNewPrizeTitle] = useState('');
+  const [newPrizeCategory, setNewPrizeCategory] = useState('Grande Prêmio');
+  const [newPrizeImage, setNewPrizeImage] = useState('');
+  const [newPrizeDesc, setNewPrizeDesc] = useState('');
+  const [newPrizeVal, setNewPrizeVal] = useState('R$ 999,00');
+  const [newPrizeBadge, setNewPrizeBadge] = useState('🏆 BINGO CHEIO');
 
   // Subscribe to all rooms in Firestore for Master Admin
   useEffect(() => {
@@ -83,6 +120,24 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
     return () => unsubscribe();
   }, [isOpen, isMasterAdmin, selectedRoomId]);
 
+  // Subscribe to registered players
+  useEffect(() => {
+    if (!isOpen || !isMasterAdmin) return;
+    const unsubscribe = firestoreService.subscribeToRegisteredPlayers((players) => {
+      setRegisteredPlayers(players);
+    });
+    return () => unsubscribe();
+  }, [isOpen, isMasterAdmin]);
+
+  // Subscribe to prizes
+  useEffect(() => {
+    if (!isOpen || !isMasterAdmin) return;
+    const unsubscribe = firestoreService.subscribeToPrizes((prizes) => {
+      setPrizesList(prizes);
+    });
+    return () => unsubscribe();
+  }, [isOpen, isMasterAdmin]);
+
   const selectedRoom = useMemo(() => {
     return allRooms.find((r) => r.id === selectedRoomId);
   }, [allRooms, selectedRoomId]);
@@ -107,7 +162,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
     setTimeout(() => setActionSuccess(null), 3000);
   };
 
-  // Admin controls
+  // Admin Room Controls
   const handleTogglePlayPause = async () => {
     if (!selectedRoom) return;
     const newStatus = selectedRoom.status === 'PLAYING' ? 'PAUSED' : 'PLAYING';
@@ -138,15 +193,14 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
       status: selectedRoom.status === 'WAITING' ? 'PLAYING' : selectedRoom.status,
     });
 
-    // Anunciar no chat
     const letter = selectedRoom.mode === 'BINGO_75' ? get75BallLetter(nextBall) + '-' : '';
     await firestoreService.sendChatMessage(selectedRoom.id, {
       id: 'admin-draw-' + Date.now(),
-      playerId: 'master-admin',
+      senderId: 'master-admin',
       senderName: '👑 Master Admin',
       text: `Bola sorteada manualmente: ${letter}${nextBall}`,
       timestamp: Date.now(),
-      type: 'BALL_DRAWN',
+      isSystem: true,
     });
 
     showFeedback(`Bola sorteada: ${letter}${nextBall}`);
@@ -158,91 +212,185 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
 
     await firestoreService.updateRoomState(selectedRoom.id, {
       drawnBalls: [],
-      currentBall: undefined,
+      currentBall: null,
       status: 'WAITING',
-      winnerId: undefined,
-      winnerName: undefined,
+      winnerId: null,
+      winnerName: null,
     });
-
-    // Limpar marcações das cartelas
-    for (const card of roomCards) {
-      await firestoreService.updatePlayerCard(selectedRoom.id, card.id, [], false);
-    }
 
     await firestoreService.sendChatMessage(selectedRoom.id, {
       id: 'admin-restart-' + Date.now(),
-      playerId: 'master-admin',
+      senderId: 'master-admin',
       senderName: '👑 Master Admin',
-      text: 'A rodada foi reiniciada pelo Administrador Master!',
+      text: 'O sorteio foi reiniciado pelo Master Admin. Cartelas limpas!',
       timestamp: Date.now(),
-      type: 'ADMIN',
+      isSystem: true,
     });
 
-    showFeedback('Rodada reiniciada com sucesso!');
+    showFeedback('Sala reiniciada com sucesso');
   };
 
-  const handleDeleteRoom = async (roomId: string) => {
-    if (!confirm('Deseja realmente excluir permanentemente esta sala?')) return;
-    await firestoreService.deleteRoom(roomId);
-    if (selectedRoomId === roomId) {
-      setSelectedRoomId('');
-    }
-    showFeedback('Sala removida do banco de dados');
+  const handleDeleteRoom = async () => {
+    if (!selectedRoom) return;
+    if (!confirm(`Tem certeza que deseja DELETAR PERMANENTEMENTE a sala "${selectedRoom.name}" (${selectedRoom.code})?`)) return;
+
+    await firestoreService.deleteRoom(selectedRoom.id);
+    setSelectedRoomId('');
+    showFeedback('Sala excluída do Firestore');
   };
 
   const handleSendAdminBroadcast = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!adminBroadcast.trim() || !selectedRoom) return;
+    if (!selectedRoom || !adminBroadcast.trim()) return;
 
     await firestoreService.sendChatMessage(selectedRoom.id, {
       id: 'broadcast-' + Date.now(),
-      playerId: 'master-admin',
-      senderName: '👑 Master Admin',
+      senderId: 'master-admin',
+      senderName: '👑 MASTER ADMIN',
       text: adminBroadcast.trim(),
       timestamp: Date.now(),
-      type: 'ADMIN',
+      isSystem: true,
     });
 
     setAdminBroadcast('');
-    showFeedback('Aviso transmitido com sucesso!');
+    showFeedback('Alerta transmitido para todos os jogadores da sala!');
   };
 
   const handleForceBingo = async (card: FirestorePlayerCard) => {
     if (!selectedRoom) return;
-    if (!confirm(`Declarar vitória de Bingo oficial para o jogador "${card.playerName}"?`)) return;
+    if (!confirm(`Declarar BINGO para "${card.playerName}" nesta sala?`)) return;
 
     await firestoreService.adminForceBingo(selectedRoom.id, card.playerId, card.playerName);
-    await firestoreService.updatePlayerCard(selectedRoom.id, card.id, card.markedNumbers, true);
-
     await firestoreService.sendChatMessage(selectedRoom.id, {
-      id: 'bingo-win-' + Date.now(),
-      playerId: card.playerId,
-      senderName: card.playerName,
-      text: `🎉 BINGO VALIDADO PELO MASTER ADMIN para ${card.playerName}!`,
+      id: 'force-bingo-' + Date.now(),
+      senderId: 'master-admin',
+      senderName: '👑 Master Admin',
+      text: `🏆 BINGO DECLARADO pelo Master Admin para o jogador ${card.playerName}!`,
       timestamp: Date.now(),
-      type: 'BINGO_CALL',
+      isBingoCall: true,
     });
 
-    showFeedback(`Vitória validada para ${card.playerName}!`);
+    showFeedback(`Bingo declarado para ${card.playerName}`);
+  };
+
+  const handleAssignPrizeToRoom = async (prize: PrizeItem) => {
+    if (!selectedRoom) {
+      alert('Selecione uma sala primeiro para vincular o prêmio.');
+      return;
+    }
+    await firestoreService.updateRoomState(selectedRoom.id, {
+      prizeId: prize.id,
+      prizeTitle: prize.title,
+      prizeImageUrl: prize.imageUrl,
+    });
+    showFeedback(`Prêmio "${prize.title}" vinculado à sala "${selectedRoom.name}"!`);
+  };
+
+  // Add new player manually from Admin
+  const handleCreatePlayerSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPlayerName.trim() || !newPlayerNick.trim()) return;
+
+    const playerRecord: RegisteredPlayer = {
+      id: 'player_adm_' + Math.random().toString(36).substring(2, 9),
+      name: newPlayerName.trim(),
+      nickname: newPlayerNick.trim(),
+      avatar: newPlayerAvatar,
+      email: newPlayerEmail.trim() || undefined,
+      phone: newPlayerPhone.trim() || undefined,
+      city: newPlayerCity.trim() || undefined,
+      luckyNumber: Number(newPlayerLuckyNumber) || 7,
+      gamesPlayed: 0,
+      bingoWins: 0,
+      registeredAt: new Date().toISOString(),
+    };
+
+    await firestoreService.registerPlayer(playerRecord);
+    setIsAddingPlayer(false);
+    setNewPlayerName('');
+    setNewPlayerNick('');
+    setNewPlayerEmail('');
+    setNewPlayerPhone('');
+    setNewPlayerCity('');
+    showFeedback(`Jogador "${playerRecord.nickname}" cadastrado com sucesso!`);
+  };
+
+  // Add new prize from Admin
+  const handleCreatePrizeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPrizeTitle.trim() || !newPrizeImage.trim()) return;
+
+    const prizeRecord: PrizeItem = {
+      id: 'prize_adm_' + Math.random().toString(36).substring(2, 9),
+      title: newPrizeTitle.trim(),
+      category: newPrizeCategory,
+      imageUrl: newPrizeImage.trim(),
+      description: newPrizeDesc.trim() || 'Prêmio oficial em disputa na rodada.',
+      estimatedValue: newPrizeVal.trim(),
+      badge: newPrizeBadge.trim(),
+    };
+
+    await firestoreService.savePrize(prizeRecord);
+    setIsAddingPrize(false);
+    setNewPrizeTitle('');
+    setNewPrizeImage('');
+    setNewPrizeDesc('');
+    showFeedback(`Prêmio "${prizeRecord.title}" cadastrado com sucesso!`);
+  };
+
+  // Filtered registered players
+  const filteredPlayers = registeredPlayers.filter((p) => {
+    const q = playerSearch.toLowerCase();
+    return (
+      (p.name || '').toLowerCase().includes(q) ||
+      (p.nickname || '').toLowerCase().includes(q) ||
+      (p.email || '').toLowerCase().includes(q) ||
+      (p.phone || '').toLowerCase().includes(q) ||
+      (p.city || '').toLowerCase().includes(q)
+    );
+  });
+
+  const handleExportPlayersCSV = () => {
+    const headers = ['ID', 'Nome', 'Apelido', 'Email', 'Telefone', 'Cidade', 'NumeroSorte', 'Vitorias', 'DataCadastro'];
+    const rows = registeredPlayers.map((p) => [
+      p.id,
+      `"${p.name || ''}"`,
+      `"${p.nickname || ''}"`,
+      `"${p.email || ''}"`,
+      `"${p.phone || ''}"`,
+      `"${p.city || ''}"`,
+      p.luckyNumber || '',
+      p.bingoWins || 0,
+      `"${p.registeredAt || ''}"`,
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `jogadores_bingo_club_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showFeedback('Lista de jogadores exportada com sucesso em CSV!');
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in overflow-y-auto">
-      <div className="relative w-full max-w-7xl max-h-[94vh] bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border-2 border-amber-500/40 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-100">
-        {/* Top Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-amber-500/30 bg-gradient-to-r from-amber-950/40 via-slate-900 to-amber-950/30">
+    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-fade-in overflow-y-auto">
+      <div className="relative w-full max-w-7xl bg-slate-900 border-2 border-amber-500/40 rounded-3xl shadow-[0_0_80px_rgba(245,158,11,0.25)] overflow-hidden flex flex-col max-h-[95vh] text-slate-100">
+        {/* Glow Header */}
+        <div className="bg-gradient-to-r from-amber-500/20 via-yellow-500/10 to-slate-900 border-b border-amber-500/30 p-4 sm:p-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 shadow-lg shadow-amber-500/30 animate-pulse">
-              <Crown className="w-6 h-6" />
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-400 to-yellow-500 text-slate-950 flex items-center justify-center shadow-lg shadow-amber-500/30">
+              <Crown className="w-6 h-6 fill-slate-950" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-xl sm:text-2xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-400 uppercase">
+                <h2 className="text-xl sm:text-2xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-400 uppercase font-display">
                   Painel Master Admin
                 </h2>
-                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono">
                   EXCLUSIVO
                 </span>
               </div>
@@ -276,9 +424,9 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
             <div className="w-20 h-20 rounded-full bg-rose-950/60 border border-rose-500/40 flex items-center justify-center mb-4 text-rose-400">
               <ShieldAlert className="w-10 h-10" />
             </div>
-            <h3 className="text-xl font-bold text-slate-100 mb-2">Acesso Restrito ao Master Admin</h3>
+            <h3 className="text-xl font-bold text-slate-100 mb-2 font-display">Acesso Restrito ao Master Admin</h3>
             <p className="text-sm text-slate-300 mb-6">
-              Este dashboard contém visão de raio-X de todas as cartelas dos jogadores e controle mestre de sorteio.
+              Este dashboard contém visão de raio-X de todas as cartelas dos jogadores, controle mestre de sorteio e gestão completa do banco de dados.
               Ele é restrito exclusivamente ao e-mail{' '}
               <strong className="text-amber-400 font-mono">{MASTER_ADMIN_EMAIL}</strong>.
             </p>
@@ -298,7 +446,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
               className="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-bold flex items-center gap-2 shadow-lg shadow-amber-500/25 transition-all transform active:scale-95"
             >
               <Crown className="w-5 h-5" />
-              Entrar com Google ({MASTER_ADMIN_EMAIL})
+              <span>Conectar como sb4fun88@gmail.com</span>
             </button>
           </div>
         ) : (
@@ -321,8 +469,8 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                   <Users className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-xs text-slate-400 font-medium">Jogadores Totais</p>
-                  <p className="text-2xl font-black text-white">{totalPlayersAcrossRooms}</p>
+                  <p className="text-xs text-slate-400 font-medium">Jogadores Cadastrados</p>
+                  <p className="text-2xl font-black text-white">{registeredPlayers.length}</p>
                 </div>
               </div>
 
@@ -338,446 +486,701 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
 
               <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5 flex items-center gap-3">
                 <div className="p-2.5 rounded-lg bg-purple-500/20 text-purple-400">
-                  <Flame className="w-5 h-5" />
+                  <Gift className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-xs text-slate-400 font-medium">Bolas Sorteadas</p>
-                  <p className="text-2xl font-black text-white">
-                    {selectedRoom?.drawnBalls?.length || 0}
-                    <span className="text-xs text-slate-400 font-normal">
-                      /{selectedRoom?.mode === 'BINGO_75' ? '75' : '90'}
-                    </span>
-                  </p>
+                  <p className="text-xs text-slate-400 font-medium">Prêmios Cadastrados</p>
+                  <p className="text-2xl font-black text-white">{prizesList.length}</p>
                 </div>
               </div>
             </div>
 
-            {/* Split Screen: Left = Rooms Selector, Right = Room Manager + ALL CARDS LIVE */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Left Column: Room Selector (4 cols) */}
-              <div className="lg:col-span-4 space-y-4">
-                <div className="bg-slate-800/40 border border-slate-700/60 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-                      <Layers className="w-4 h-4 text-amber-400" />
-                      Salas no Firestore ({filteredRooms.length})
-                    </h3>
-                  </div>
+            {/* Navigation Tabs for Master Admin */}
+            <div className="flex border-b border-slate-700/80 gap-3 pb-1">
+              <button
+                onClick={() => setAdminTab('rooms')}
+                className={`pb-2 px-3 text-xs font-bold font-display transition-all border-b-2 flex items-center gap-2 ${
+                  adminTab === 'rooms'
+                    ? 'border-amber-400 text-amber-300'
+                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Layers className="w-4 h-4" />
+                <span>Salas & Raio-X de Cartelas</span>
+              </button>
 
-                  {/* Filter & Search */}
-                  <div className="space-y-2 mb-3">
-                    <div className="relative">
-                      <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
-                      <input
-                        type="text"
-                        placeholder="Buscar por nome ou código..."
-                        value={filterSearch}
-                        onChange={(e) => setFilterSearch(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-amber-500"
-                      />
+              <button
+                onClick={() => setAdminTab('players')}
+                className={`pb-2 px-3 text-xs font-bold font-display transition-all border-b-2 flex items-center gap-2 ${
+                  adminTab === 'players'
+                    ? 'border-emerald-400 text-emerald-300'
+                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Users className="w-4 h-4" />
+                <span>Jogadores Cadastrados ({registeredPlayers.length})</span>
+              </button>
+
+              <button
+                onClick={() => setAdminTab('prizes')}
+                className={`pb-2 px-3 text-xs font-bold font-display transition-all border-b-2 flex items-center gap-2 ${
+                  adminTab === 'prizes'
+                    ? 'border-purple-400 text-purple-300'
+                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Gift className="w-4 h-4" />
+                <span>Catálogo de Prêmios ({prizesList.length})</span>
+              </button>
+            </div>
+
+            {/* TAB 1: ROOMS & CARDS */}
+            {adminTab === 'rooms' && (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Left Column: Room Selector (4 cols) */}
+                <div className="lg:col-span-4 space-y-4">
+                  <div className="bg-slate-800/40 border border-slate-700/60 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2 font-display">
+                        <Layers className="w-4 h-4 text-amber-400" />
+                        Salas no Firestore ({filteredRooms.length})
+                      </h3>
                     </div>
 
-                    <div className="flex gap-1 overflow-x-auto pb-1 text-xs">
-                      {(['ALL', 'PLAYING', 'WAITING', 'FINISHED'] as const).map((st) => (
-                        <button
-                          key={st}
-                          onClick={() => setStatusFilter(st)}
-                          className={`px-2.5 py-1 rounded-md font-medium shrink-0 transition-colors ${
-                            statusFilter === st
-                              ? 'bg-amber-500 text-slate-950 font-bold'
-                              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                          }`}
-                        >
-                          {st === 'ALL'
-                            ? 'Todas'
-                            : st === 'PLAYING'
-                            ? 'Ao Vivo'
-                            : st === 'WAITING'
-                            ? 'Aguardando'
-                            : 'Fim'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Rooms List */}
-                  <div className="space-y-2 max-h-[460px] overflow-y-auto pr-1">
-                    {filteredRooms.length === 0 ? (
-                      <div className="text-center py-8 text-slate-500 text-xs">
-                        Nenhuma sala encontrada no Firestore.
+                    {/* Filter & Search */}
+                    <div className="space-y-2 mb-3">
+                      <div className="relative">
+                        <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                        <input
+                          type="text"
+                          value={filterSearch}
+                          onChange={(e) => setFilterSearch(e.target.value)}
+                          placeholder="Buscar por código, nome ou anfitrião..."
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                        />
                       </div>
-                    ) : (
-                      filteredRooms.map((r) => {
-                        const isSelected = r.id === selectedRoomId;
-                        return (
-                          <div
-                            key={r.id}
-                            onClick={() => setSelectedRoomId(r.id)}
-                            className={`p-3 rounded-xl border cursor-pointer transition-all ${
-                              isSelected
-                                ? 'bg-amber-950/40 border-amber-500/80 shadow-md shadow-amber-500/10'
-                                : 'bg-slate-800/30 border-slate-700/50 hover:bg-slate-800/80 hover:border-slate-600'
+
+                      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px]">
+                        {(['ALL', 'WAITING', 'PLAYING', 'FINISHED'] as const).map((st) => (
+                          <button
+                            key={st}
+                            onClick={() => setStatusFilter(st)}
+                            className={`px-2.5 py-1 rounded-md font-semibold transition-colors whitespace-nowrap ${
+                              statusFilter === st
+                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                                : 'bg-slate-900 text-slate-400 hover:text-white'
                             }`}
                           >
-                            <div className="flex items-start justify-between">
-                              <div>
-                                <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
-                                  {r.name || 'Sala de Bingo'}
-                                  {r.isPrivate && (
-                                    <span className="text-[10px] bg-slate-700 text-slate-300 px-1 rounded">
-                                      Privada
-                                    </span>
-                                  )}
-                                </h4>
-                                <p className="text-xs text-slate-400 mt-0.5">
-                                  Código: <span className="font-mono text-amber-300 font-bold">{r.code}</span> •
-                                  Host: {r.hostName || 'Host'}
-                                </p>
-                              </div>
-                              <span
-                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
-                                  r.status === 'PLAYING'
-                                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 animate-pulse'
-                                    : r.status === 'FINISHED'
-                                    ? 'bg-purple-500/20 text-purple-300'
-                                    : 'bg-amber-500/20 text-amber-300'
-                                }`}
-                              >
-                                {r.status}
-                              </span>
-                            </div>
+                            {st === 'ALL' ? 'Todas' : st === 'WAITING' ? 'Aguardando' : st === 'PLAYING' ? 'Em Jogo' : 'Finalizadas'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
-                            <div className="flex items-center justify-between text-xs text-slate-400 mt-2 pt-2 border-t border-slate-700/40">
-                              <span className="flex items-center gap-1">
-                                <Users className="w-3.5 h-3.5 text-slate-500" />
-                                {r.playerCount || 1} jogadores
-                              </span>
-                              <span className="font-semibold text-slate-300">
-                                {r.mode === 'BINGO_75' ? '75 Bolas' : '90 Bolas'}
+                    {/* Rooms List */}
+                    <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+                      {filteredRooms.length === 0 ? (
+                        <div className="text-center py-8 text-xs text-slate-500">
+                          Nenhuma sala encontrada no Firestore.
+                        </div>
+                      ) : (
+                        filteredRooms.map((r) => {
+                          const isSelected = r.id === selectedRoomId;
+                          return (
+                            <button
+                              key={r.id}
+                              onClick={() => setSelectedRoomId(r.id)}
+                              className={`w-full p-3 rounded-xl border text-left transition-all flex items-start justify-between gap-2 ${
+                                isSelected
+                                  ? 'bg-amber-500/15 border-amber-400/60 shadow-lg shadow-amber-500/10'
+                                  : 'bg-slate-900/60 border-slate-700/40 hover:bg-slate-900'
+                              }`}
+                            >
+                              <div className="overflow-hidden">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-mono font-bold text-amber-400 text-xs">{r.code}</span>
+                                  <span
+                                    className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                                      r.status === 'PLAYING'
+                                        ? 'bg-emerald-500/20 text-emerald-300'
+                                        : r.status === 'WAITING'
+                                        ? 'bg-blue-500/20 text-blue-300'
+                                        : 'bg-slate-700 text-slate-300'
+                                    }`}
+                                  >
+                                    {r.status}
+                                  </span>
+                                </div>
+                                <p className="text-xs font-bold text-slate-200 truncate mt-0.5">{r.name}</p>
+                                <p className="text-[11px] text-slate-400 truncate">Host: {r.hostName || 'Anônimo'}</p>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <span className="text-[10px] text-slate-400 font-mono block">
+                                  {r.mode === 'BINGO_75' ? '75B' : '90B'}
+                                </span>
+                                <span className="text-xs text-cyan-400 font-bold flex items-center gap-1 mt-1">
+                                  <Users className="w-3 h-3" />
+                                  {r.playerCount || 1}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column: Room Details, Master Controls & ALL CARDS LIVE (8 cols) */}
+                <div className="lg:col-span-8 space-y-6">
+                  {selectedRoom ? (
+                    <>
+                      {/* Active Room Command Strip */}
+                      <div className="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-4 sm:p-5 shadow-lg">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-700/60">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-lg font-black text-white font-display">{selectedRoom.name}</h3>
+                              <span className="font-mono text-sm px-2 py-0.5 rounded-lg bg-amber-400/20 text-amber-300 font-bold border border-amber-400/40">
+                                {selectedRoom.code}
                               </span>
                             </div>
+                            <p className="text-xs text-slate-400 mt-0.5">
+                              Modo: <strong className="text-cyan-400">{selectedRoom.mode}</strong> · Status:{' '}
+                              <strong className="text-emerald-400">{selectedRoom.status}</strong> · Host:{' '}
+                              <strong className="text-white">{selectedRoom.hostName}</strong>
+                            </p>
                           </div>
-                        );
-                      })
-                    )}
+
+                          {/* Quick Admin Actions */}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                              onClick={handleTogglePlayPause}
+                              className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-sm ${
+                                selectedRoom.status === 'PLAYING'
+                                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30'
+                                  : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30'
+                              }`}
+                            >
+                              {selectedRoom.status === 'PLAYING' ? (
+                                <>
+                                  <Pause className="w-3.5 h-3.5" />
+                                  <span>Pausar</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Play className="w-3.5 h-3.5" />
+                                  <span>Iniciar/Retomar</span>
+                                </>
+                              )}
+                            </button>
+
+                            <button
+                              onClick={handleDrawManualBall}
+                              className="px-3 py-1.5 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/40 hover:bg-purple-500/30 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95"
+                            >
+                              <Sparkles className="w-3.5 h-3.5" />
+                              <span>Sortear Pedra</span>
+                            </button>
+
+                            <button
+                              onClick={handleRestartRoom}
+                              className="px-3 py-1.5 rounded-xl bg-slate-700/60 text-slate-300 border border-slate-600 hover:bg-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              <span>Reiniciar</span>
+                            </button>
+
+                            <button
+                              onClick={handleDeleteRoom}
+                              className="px-3 py-1.5 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500/30 font-bold text-xs flex items-center gap-1.5 transition-all"
+                              title="Excluir permanentemente"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Excluir</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Broadcast Message to Room */}
+                        <form onSubmit={handleSendAdminBroadcast} className="mt-4 flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={adminBroadcast}
+                            onChange={(e) => setAdminBroadcast(e.target.value)}
+                            placeholder="Anunciar mensagem oficial para o chat desta sala..."
+                            className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                          />
+                          <button
+                            type="submit"
+                            className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-all shrink-0 active:scale-95"
+                          >
+                            <Send className="w-3.5 h-3.5" />
+                            <span>Transmitir</span>
+                          </button>
+                        </form>
+                      </div>
+
+                      {/* LIVE RAY-X OVERVIEW OF ALL CARDS */}
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-sm font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2 font-display">
+                            <Eye className="w-4 h-4 text-cyan-400" />
+                            Visão Raio-X: Todas as Cartelas ao Vivo ({roomCards.length})
+                          </h4>
+                          <span className="text-xs text-slate-400">
+                            Atualizado em tempo real via Firestore
+                          </span>
+                        </div>
+
+                        {roomCards.length === 0 ? (
+                          <div className="p-8 text-center bg-slate-800/40 border border-slate-700/60 rounded-2xl text-xs text-slate-500">
+                            Nenhuma cartela registrada nesta sala ainda.
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                            {roomCards.map((card) => {
+                              const drawnSet = new Set<number>(selectedRoom.drawnBalls || []);
+                              return (
+                                <div
+                                  key={card.id}
+                                  className={`p-3.5 rounded-2xl border flex flex-col justify-between gap-3 ${
+                                    card.isWinner
+                                      ? 'bg-amber-500/10 border-amber-400/80 shadow-lg shadow-amber-500/20'
+                                      : 'bg-slate-800/50 border-slate-700/60'
+                                  }`}
+                                >
+                                  <div>
+                                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-700/60">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-lg">{card.playerAvatar || '⭐'}</span>
+                                        <div>
+                                          <p className="text-xs font-bold text-white leading-none">{card.playerName}</p>
+                                          <span className="text-[10px] text-slate-400 font-mono">ID: {card.playerId.slice(0, 8)}</span>
+                                        </div>
+                                      </div>
+                                      {card.isWinner && (
+                                        <span className="px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] uppercase">
+                                          Vencedor
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {/* Mini Grid representation */}
+                                    <div className="grid grid-cols-5 gap-1 bg-slate-900/80 p-1.5 rounded-xl border border-slate-700/40">
+                                      {card.numbers?.map((row, rIdx) =>
+                                        row?.map((num, cIdx) => {
+                                          if (num === null) {
+                                            return (
+                                              <div
+                                                key={`${rIdx}-${cIdx}`}
+                                                className="aspect-square rounded flex items-center justify-center text-[10px] font-bold bg-amber-500/30 text-amber-300"
+                                              >
+                                                ★
+                                              </div>
+                                            );
+                                          }
+                                          const isDrawn = drawnSet.has(num);
+                                          return (
+                                            <div
+                                              key={`${rIdx}-${cIdx}`}
+                                              className={`aspect-square rounded flex items-center justify-center text-[11px] font-bold font-mono ${
+                                                isDrawn
+                                                  ? 'bg-emerald-500 text-slate-950 font-black'
+                                                  : 'bg-slate-800 text-slate-300'
+                                              }`}
+                                            >
+                                              {num}
+                                            </div>
+                                          );
+                                        })
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center justify-between text-xs pt-1">
+                                    <div className="flex items-center gap-1.5 text-slate-400 text-[11px]">
+                                      <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                                      Verde = sorteada
+                                    </div>
+
+                                    <button
+                                      onClick={() => handleForceBingo(card)}
+                                      className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-slate-950 font-bold border border-amber-500/40 text-[11px] flex items-center gap-1 transition-all"
+                                    >
+                                      <Trophy className="w-3 h-3" />
+                                      Declarar Bingo
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center py-20 bg-slate-800/30 border border-slate-700/60 rounded-xl">
+                      <Grid className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                      <p className="text-base text-slate-300 font-bold">Nenhuma sala selecionada</p>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Selecione uma sala na coluna à esquerda para gerenciar o jogo e ver todas as cartelas ao vivo.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: REGISTERED PLAYERS DIRECTORY (10, 20, 100+ PLAYERS) */}
+            {adminTab === 'players' && (
+              <div className="space-y-4">
+                {/* Header Controls */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-slate-800/50 p-4 rounded-2xl border border-slate-700/60">
+                  <div className="flex-1 relative">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={playerSearch}
+                      onChange={(e) => setPlayerSearch(e.target.value)}
+                      placeholder="Pesquisar por nome, apelido, email, telefone ou cidade..."
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleExportPlayersCSV}
+                      className="px-3.5 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm"
+                      title="Baixar lista de jogadores em formato CSV"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Exportar CSV</span>
+                    </button>
+
+                    <button
+                      onClick={() => setIsAddingPlayer(!isAddingPlayer)}
+                      className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs flex items-center gap-1.5 transition-all shadow-lg shadow-emerald-500/25 active:scale-95"
+                    >
+                      <UserPlus className="w-4 h-4" />
+                      <span>+ Cadastrar Jogador</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Form to add new player manually */}
+                {isAddingPlayer && (
+                  <form onSubmit={handleCreatePlayerSubmit} className="bg-slate-800/80 border border-emerald-500/40 rounded-2xl p-4 sm:p-5 space-y-4 animate-fade-in">
+                    <h4 className="text-xs font-black uppercase tracking-wider text-emerald-400 font-display flex items-center gap-2">
+                      <UserPlus className="w-4 h-4" />
+                      <span>Cadastrar Novo Jogador Manualmente no Firestore</span>
+                    </h4>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-300 mb-1">Nome Completo *</label>
+                        <input
+                          type="text"
+                          required
+                          value={newPlayerName}
+                          onChange={(e) => setNewPlayerName(e.target.value)}
+                          placeholder="Ex: João da Silva"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-300 mb-1">Apelido na Mesa *</label>
+                        <input
+                          type="text"
+                          required
+                          value={newPlayerNick}
+                          onChange={(e) => setNewPlayerNick(e.target.value)}
+                          placeholder="Ex: JoaoSorte"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-300 mb-1">Avatar</label>
+                        <select
+                          value={newPlayerAvatar}
+                          onChange={(e) => setNewPlayerAvatar(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400"
+                        >
+                          {AVATARS.map((av) => (
+                            <option key={av} value={av}>
+                              {av} Avatar
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-300 mb-1">E-mail</label>
+                        <input
+                          type="email"
+                          value={newPlayerEmail}
+                          onChange={(e) => setNewPlayerEmail(e.target.value)}
+                          placeholder="email@exemplo.com"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-300 mb-1">WhatsApp / Telefone</label>
+                        <input
+                          type="tel"
+                          value={newPlayerPhone}
+                          onChange={(e) => setNewPlayerPhone(e.target.value)}
+                          placeholder="(41) 99999-9999"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-300 mb-1">Cidade / Estado</label>
+                        <input
+                          type="text"
+                          value={newPlayerCity}
+                          onChange={(e) => setNewPlayerCity(e.target.value)}
+                          placeholder="Ex: Curitiba - PR"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-400"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsAddingPlayer(false)}
+                        className="px-3 py-1.5 text-xs text-slate-400 hover:text-white"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-4 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl"
+                      >
+                        Confirmar Cadastro
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* Players Table */}
+                <div className="bg-slate-800/40 border border-slate-700/60 rounded-2xl overflow-hidden shadow-xl">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-900/80 text-slate-400 font-mono text-[11px] uppercase border-b border-slate-700">
+                        <tr>
+                          <th className="p-3.5">Jogador</th>
+                          <th className="p-3.5">Nome Completo</th>
+                          <th className="p-3.5">Contato</th>
+                          <th className="p-3.5">Cidade</th>
+                          <th className="p-3.5 text-center">Nº Sorte</th>
+                          <th className="p-3.5 text-center">Vitórias</th>
+                          <th className="p-3.5">Data Registro</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-700/40">
+                        {filteredPlayers.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="p-8 text-center text-slate-500">
+                              Nenhum jogador cadastrado encontrado.
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredPlayers.map((player) => (
+                            <tr key={player.id} className="hover:bg-slate-800/60 transition-colors">
+                              <td className="p-3.5 flex items-center gap-2.5">
+                                <span className="text-xl">{player.avatar || '⭐'}</span>
+                                <div>
+                                  <p className="font-bold text-white text-xs">{player.nickname}</p>
+                                  <span className="text-[10px] text-slate-500 font-mono">{player.id.slice(0, 10)}</span>
+                                </div>
+                              </td>
+                              <td className="p-3.5 text-slate-200 font-medium">{player.name}</td>
+                              <td className="p-3.5 text-slate-300">
+                                {player.email && (
+                                  <div className="flex items-center gap-1 text-[11px] text-slate-300">
+                                    <Mail className="w-3 h-3 text-slate-400 shrink-0" />
+                                    <span>{player.email}</span>
+                                  </div>
+                                )}
+                                {player.phone && (
+                                  <div className="flex items-center gap-1 text-[11px] text-emerald-400 font-mono mt-0.5">
+                                    <Phone className="w-3 h-3 text-emerald-400 shrink-0" />
+                                    <span>{player.phone}</span>
+                                  </div>
+                                )}
+                              </td>
+                              <td className="p-3.5 text-slate-300">
+                                {player.city ? (
+                                  <span className="flex items-center gap-1 text-[11px]">
+                                    <MapPin className="w-3 h-3 text-rose-400 shrink-0" />
+                                    {player.city}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-500">-</span>
+                                )}
+                              </td>
+                              <td className="p-3.5 text-center font-mono font-bold text-amber-400">
+                                {player.luckyNumber ? `#${player.luckyNumber}` : '-'}
+                              </td>
+                              <td className="p-3.5 text-center">
+                                <span className="px-2 py-0.5 rounded-full bg-amber-400/10 text-amber-300 font-bold border border-amber-400/20 text-[11px]">
+                                  {player.bingoWins || 0}
+                                </span>
+                              </td>
+                              <td className="p-3.5 text-slate-400 text-[11px]">
+                                {player.registeredAt
+                                  ? new Date(player.registeredAt).toLocaleDateString('pt-BR')
+                                  : '-'}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </div>
+            )}
 
-              {/* Right Column: Room Controls + All Live Cards (8 cols) */}
-              <div className="lg:col-span-8 space-y-5">
-                {selectedRoom ? (
-                  <>
-                    {/* Master Action Header for Selected Room */}
-                    <div className="bg-slate-800/40 border border-amber-500/30 rounded-xl p-4">
-                      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            {/* TAB 3: PRIZES CATALOG & IMAGES */}
+            {adminTab === 'prizes' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between bg-slate-800/50 p-4 rounded-2xl border border-slate-700/60">
+                  <div>
+                    <h4 className="text-sm font-bold text-white font-display flex items-center gap-2">
+                      <Gift className="w-4 h-4 text-amber-400" />
+                      <span>Catálogo Oficial de Imagens de Prêmios</span>
+                    </h4>
+                    <p className="text-xs text-slate-400">
+                      Imagens reais exibidas aos jogadores durante o jogo e no momento da vitória
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => setIsAddingPrize(!isAddingPrize)}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 font-black text-xs flex items-center gap-1.5 transition-all shadow-md active:scale-95"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Novo Prêmio</span>
+                  </button>
+                </div>
+
+                {isAddingPrize && (
+                  <form onSubmit={handleCreatePrizeSubmit} className="bg-slate-800/80 border border-amber-500/40 rounded-2xl p-4 sm:p-5 space-y-4 animate-fade-in">
+                    <h5 className="text-xs font-black uppercase tracking-wider text-amber-400 font-display">
+                      Adicionar Novo Prêmio com Imagem
+                    </h5>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-300 mb-1">Título do Prêmio *</label>
+                        <input
+                          type="text"
+                          required
+                          value={newPrizeTitle}
+                          onChange={(e) => setNewPrizeTitle(e.target.value)}
+                          placeholder="Ex: Smart TV 65 polegadas"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-300 mb-1">URL da Imagem (HTTPS) *</label>
+                        <input
+                          type="url"
+                          required
+                          value={newPrizeImage}
+                          onChange={(e) => setNewPrizeImage(e.target.value)}
+                          placeholder="https://images.unsplash.com/..."
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-300 mb-1">Valor Estimado</label>
+                        <input
+                          type="text"
+                          value={newPrizeVal}
+                          onChange={(e) => setNewPrizeVal(e.target.value)}
+                          placeholder="R$ 1.500,00"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-400"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsAddingPrize(false)}
+                        className="px-3 py-1.5 text-xs text-slate-400 hover:text-white"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl"
+                      >
+                        Salvar Prêmio
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* Grid of Prizes */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {prizesList.map((prize) => (
+                    <div
+                      key={prize.id}
+                      className="bg-slate-800/60 border border-slate-700/60 rounded-2xl overflow-hidden shadow-lg flex flex-col justify-between"
+                    >
+                      <div className="relative aspect-video w-full bg-slate-950 overflow-hidden">
+                        <img src={prize.imageUrl} alt={prize.title} className="w-full h-full object-cover" />
+                        <span className="absolute top-2 left-2 px-2 py-0.5 rounded-lg bg-black/70 backdrop-blur-md text-[10px] font-bold text-amber-300 font-mono border border-amber-500/30">
+                          {prize.badge || prize.category}
+                        </span>
+                      </div>
+
+                      <div className="p-4 space-y-2 flex-1 flex flex-col justify-between">
                         <div>
-                          <div className="flex items-center gap-2">
-                            <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-mono font-bold">
-                              {selectedRoom.code}
-                            </span>
-                            <h3 className="text-lg font-bold text-white">{selectedRoom.name}</h3>
-                          </div>
-                          <p className="text-xs text-slate-400 mt-1">
-                            Status atual:{' '}
-                            <strong className="text-amber-400 uppercase">{selectedRoom.status}</strong> • Regra:{' '}
-                            <span className="text-slate-300">{selectedRoom.winningRule || 'Padrão'}</span> •
-                            Velocidade: {selectedRoom.drawSpeedSeconds || 4}s
-                          </p>
+                          <h5 className="text-sm font-bold text-white font-display">{prize.title}</h5>
+                          <p className="text-xs text-slate-300 line-clamp-2 mt-1">{prize.description}</p>
+                          {prize.estimatedValue && (
+                            <p className="text-xs font-mono font-bold text-amber-400 mt-2">
+                              Valor: {prize.estimatedValue}
+                            </p>
+                          )}
                         </div>
 
-                        {/* Master Quick Controls */}
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="pt-3 border-t border-slate-700/60 flex items-center justify-between gap-2">
                           <button
-                            onClick={handleDrawManualBall}
-                            className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 shadow-md shadow-amber-500/20"
-                            title="Sortear Próxima Bola Imediatamente"
+                            onClick={() => handleAssignPrizeToRoom(prize)}
+                            className="px-3 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30 font-bold text-xs flex items-center gap-1.5 transition-all"
+                            title="Vincular este prêmio à sala selecionada"
                           >
-                            <Play className="w-3.5 h-3.5" />
-                            Sortear Bola
+                            <Trophy className="w-3.5 h-3.5" />
+                            <span>Vincular à Sala</span>
                           </button>
 
                           <button
-                            onClick={handleTogglePlayPause}
-                            className={`px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 border ${
-                              selectedRoom.status === 'PLAYING'
-                                ? 'bg-amber-950/60 text-amber-300 border-amber-500/40 hover:bg-amber-900/60'
-                                : 'bg-emerald-950/60 text-emerald-300 border-emerald-500/40 hover:bg-emerald-900/60'
-                            }`}
-                          >
-                            {selectedRoom.status === 'PLAYING' ? (
-                              <>
-                                <Pause className="w-3.5 h-3.5" />
-                                Pausar
-                              </>
-                            ) : (
-                              <>
-                                <Play className="w-3.5 h-3.5" />
-                                Iniciar
-                              </>
-                            )}
-                          </button>
-
-                          <button
-                            onClick={handleRestartRoom}
-                            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 font-medium text-xs flex items-center gap-1.5"
-                            title="Reiniciar Rodada e Limpar Bolas"
-                          >
-                            <RotateCcw className="w-3.5 h-3.5" />
-                            Reiniciar
-                          </button>
-
-                          <button
-                            onClick={() => handleDeleteRoom(selectedRoom.id)}
-                            className="p-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-500/30 text-xs"
-                            title="Excluir Sala do Firestore"
+                            onClick={() => firestoreService.deletePrize(prize.id)}
+                            className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/20 transition-colors"
+                            title="Remover prêmio"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </div>
-
-                      {/* Ball Sequence Preview */}
-                      <div className="bg-slate-900/80 rounded-lg p-2.5 border border-slate-700/60">
-                        <div className="flex items-center justify-between text-xs text-slate-400 mb-1.5">
-                          <span className="font-semibold text-slate-300 flex items-center gap-1">
-                            <Radio className="w-3.5 h-3.5 text-amber-400" />
-                            Bolas Sorteadas ({selectedRoom.drawnBalls?.length || 0})
-                          </span>
-                          {selectedRoom.currentBall && (
-                            <span className="text-amber-400 font-bold">
-                              Última Bola: #{selectedRoom.currentBall}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex gap-1.5 overflow-x-auto py-1">
-                          {selectedRoom.drawnBalls && selectedRoom.drawnBalls.length > 0 ? (
-                            selectedRoom.drawnBalls
-                              .slice(-15)
-                              .reverse()
-                              .map((ball: number, idx: number) => {
-                                const isLatest = idx === 0;
-                                return (
-                                  <div
-                                    key={idx}
-                                    className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
-                                      isLatest
-                                        ? 'bg-gradient-to-tr from-amber-400 to-yellow-300 text-slate-950 ring-2 ring-amber-300 ring-offset-2 ring-offset-slate-900 shadow-lg animate-bounce'
-                                        : 'bg-slate-800 text-slate-200 border border-slate-700'
-                                    }`}
-                                  >
-                                    {ball}
-                                  </div>
-                                );
-                              })
-                          ) : (
-                            <span className="text-xs text-slate-500 py-1">Nenhuma bola sorteada ainda.</span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Admin Announcement Bar */}
-                      <form onSubmit={handleSendAdminBroadcast} className="mt-3 flex gap-2">
-                        <input
-                          type="text"
-                          placeholder="Transmitir aviso oficial como Master Admin no chat desta sala..."
-                          value={adminBroadcast}
-                          onChange={(e) => setAdminBroadcast(e.target.value)}
-                          className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-500"
-                        />
-                        <button
-                          type="submit"
-                          className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1"
-                        >
-                          <Send className="w-3.5 h-3.5" />
-                          Transmitir
-                        </button>
-                      </form>
                     </div>
-
-                    {/* LIVE CARDS VIEW - O diferencial solicitado pelo usuário */}
-                    <div className="bg-slate-800/40 border border-slate-700/60 rounded-xl p-4">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-2">
-                          <Eye className="w-5 h-5 text-amber-400" />
-                          <h4 className="text-sm font-bold uppercase tracking-wider text-white">
-                            Visão de Raio-X: Todas as Cartelas dos Jogadores ({roomCards.length})
-                          </h4>
-                        </div>
-                        <span className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 rounded-full">
-                          Sincronização em Tempo Real (Firestore)
-                        </span>
-                      </div>
-
-                      {roomCards.length === 0 ? (
-                        <div className="text-center py-12 border border-dashed border-slate-700 rounded-xl">
-                          <Users className="w-10 h-10 text-slate-600 mx-auto mb-2" />
-                          <p className="text-sm text-slate-400 font-medium">
-                            Nenhuma cartela registrada nesta sala ainda.
-                          </p>
-                          <p className="text-xs text-slate-500 mt-1">
-                            As cartelas aparecerão aqui assim que os jogadores entrarem na sala.
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {roomCards.map((card) => {
-                            const drawnSet = new Set<number>(selectedRoom?.drawnBalls || []);
-                            const markedSet = new Set<number>(card.markedNumbers || []);
-
-                            // Calcular números faltantes para bingo completo
-                            let totalCardNumbers = 0;
-                            let remainingToHit = 0;
-
-                            card.numbers.forEach((row) => {
-                              row.forEach((num) => {
-                                if (num !== null) {
-                                  totalCardNumbers++;
-                                  if (!drawnSet.has(num)) {
-                                    remainingToHit++;
-                                  }
-                                }
-                              });
-                            });
-
-                            const isAlmostBingo = remainingToHit > 0 && remainingToHit <= 3;
-                            const hasAllNumbersDrawn = remainingToHit === 0;
-
-                            return (
-                              <div
-                                key={card.id}
-                                className={`p-4 rounded-xl border transition-all ${
-                                  card.isWinner
-                                    ? 'bg-purple-950/40 border-purple-500 shadow-lg shadow-purple-500/20'
-                                    : isAlmostBingo
-                                    ? 'bg-amber-950/30 border-amber-500/70 shadow-md shadow-amber-500/10'
-                                    : 'bg-slate-900/70 border-slate-700/80 hover:border-slate-600'
-                                }`}
-                              >
-                                {/* Card Player Header */}
-                                <div className="flex items-center justify-between mb-2.5">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-2xl">{card.playerAvatar || '👤'}</span>
-                                    <div>
-                                      <h5 className="text-sm font-bold text-white flex items-center gap-1.5">
-                                        {card.playerName}
-                                        {card.isWinner && (
-                                          <Trophy className="w-4 h-4 text-yellow-400 animate-bounce" />
-                                        )}
-                                      </h5>
-                                      <p className="text-[11px] text-slate-400 font-mono">
-                                        ID: {card.playerId.slice(0, 8)}...
-                                      </p>
-                                    </div>
-                                  </div>
-
-                                  <div className="text-right">
-                                    {card.isWinner ? (
-                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-purple-500 text-white uppercase tracking-wider">
-                                        Vencedor!
-                                      </span>
-                                    ) : (
-                                      <span
-                                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                                          isAlmostBingo
-                                            ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse'
-                                            : 'bg-slate-800 text-slate-300 border-slate-700'
-                                        }`}
-                                      >
-                                        Faltam: {remainingToHit} nº
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {/* Mini Card Grid Preview */}
-                                <div className="bg-slate-950/80 p-2 rounded-lg border border-slate-800 mb-3">
-                                  {card.mode === 'BINGO_75' ? (
-                                    <div className="grid grid-cols-5 gap-1 text-center">
-                                      {card.numbers.map((row, rIdx) =>
-                                        row.map((cell, cIdx) => {
-                                          const isFree = cell === null;
-                                          const isDrawn = cell !== null && drawnSet.has(cell);
-                                          const isMarked = cell !== null && markedSet.has(cell);
-
-                                          return (
-                                            <div
-                                              key={`${rIdx}-${cIdx}`}
-                                              className={`h-7 rounded flex items-center justify-center text-xs font-bold transition-all ${
-                                                isFree
-                                                  ? 'bg-amber-500/30 text-amber-300 border border-amber-500/50'
-                                                  : isDrawn
-                                                  ? 'bg-emerald-600 text-white ring-1 ring-emerald-400 shadow-sm'
-                                                  : 'bg-slate-800/80 text-slate-400'
-                                              }`}
-                                              title={isFree ? 'FREE' : `Número ${cell} (${isDrawn ? 'Sorteado' : 'Aguardando'})`}
-                                            >
-                                              {isFree ? '★' : cell}
-                                            </div>
-                                          );
-                                        })
-                                      )}
-                                    </div>
-                                  ) : (
-                                    /* Bingo 90 Mini Grid */
-                                    <div className="grid grid-cols-9 gap-0.5 text-center">
-                                      {card.numbers.map((row, rIdx) =>
-                                        row.map((cell, cIdx) => {
-                                          const isBlank = cell === null;
-                                          const isDrawn = cell !== null && drawnSet.has(cell);
-                                          return (
-                                            <div
-                                              key={`${rIdx}-${cIdx}`}
-                                              className={`h-6 rounded text-[10px] font-bold flex items-center justify-center ${
-                                                isBlank
-                                                  ? 'bg-slate-900/40 text-transparent'
-                                                  : isDrawn
-                                                  ? 'bg-emerald-600 text-white font-black ring-1 ring-emerald-400'
-                                                  : 'bg-slate-800 text-slate-300'
-                                              }`}
-                                            >
-                                              {isBlank ? '•' : cell}
-                                            </div>
-                                          );
-                                        })
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Master Card Action Buttons */}
-                                <div className="flex items-center justify-between text-xs pt-1">
-                                  <div className="flex items-center gap-1.5 text-slate-400 text-[11px]">
-                                    <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
-                                    Verde = sorteada
-                                  </div>
-
-                                  <button
-                                    onClick={() => handleForceBingo(card)}
-                                    className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-slate-950 font-bold border border-amber-500/40 text-[11px] flex items-center gap-1 transition-all"
-                                  >
-                                    <Trophy className="w-3 h-3" />
-                                    Declarar Bingo
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-center py-20 bg-slate-800/30 border border-slate-700/60 rounded-xl">
-                    <Grid className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                    <p className="text-base text-slate-300 font-bold">Nenhuma sala selecionada</p>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Selecione uma sala na coluna à esquerda para gerenciar o jogo e ver todas as cartelas ao vivo.
-                    </p>
-                  </div>
-                )}
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
       </div>

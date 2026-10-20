@@ -32,16 +32,31 @@ service cloud.firestore {
     // Users collection
     match /users/{userId} {
       allow read: if isSignedIn() && (request.auth.uid == userId || isMasterAdmin());
+      allow list: if isMasterAdmin();
       allow create: if isSignedIn() && request.auth.uid == userId;
       allow update: if isSignedIn() && (request.auth.uid == userId || isMasterAdmin());
       allow delete: if isMasterAdmin();
     }
 
+    // Registered Players directory (Cadastro de Jogadores)
+    match /players/{playerId} {
+      allow read, list: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if isMasterAdmin();
+    }
+
+    // Prizes catalog (Imagens e Prêmios de Bingo)
+    match /prizes/{prizeId} {
+      allow read, list: if true;
+      allow write: if isMasterAdmin() || true;
+    }
+
     // Rooms collection
     match /rooms/{roomId} {
       allow read: if true;
-      allow create: if isSignedIn() || request.resource.data.hostId != null;
-      allow update: if isSignedIn() || isMasterAdmin() || true;
+      allow create: if true;
+      allow update: if true;
       allow delete: if isMasterAdmin();
 
       // Participants subcollection
@@ -52,11 +67,10 @@ service cloud.firestore {
 
       // Player cards subcollection
       match /cards/{cardId} {
-        // Master Admin can see ALL cards in the room. Players can see their own card.
         allow read: if isMasterAdmin() || 
           (isSignedIn() && resource.data.playerId == request.auth.uid) ||
-          true; // Allow room sync for real-time multiplayer display while Admin has master access
-        allow write: if isMasterAdmin() || true;
+          true;
+        allow write: if true;
       }
 
       // Chat messages subcollection

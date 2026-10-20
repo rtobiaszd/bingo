@@ -152,6 +152,8 @@ class MultiplayerService {
               isPrivate: false,
               winningRule: room.winningRule,
               drawSpeedSeconds: room.drawSpeedSeconds,
+              prizeTitle: room.prizeTitle,
+              prizeImageUrl: room.prizeImageUrl,
               createdAt: room.createdAt,
             });
           }
@@ -244,7 +246,9 @@ class MultiplayerService {
     winningRule: WinningRule = 'ANY',
     drawSpeedSeconds: number = 4,
     isPrivate: boolean = false,
-    customRoomName?: string
+    customRoomName?: string,
+    prizeTitle?: string,
+    prizeImageUrl?: string
   ): { room: RoomState; playerId: string } {
     this.leaveRoom();
 
@@ -281,6 +285,10 @@ class MultiplayerService {
       winningRule,
       isPrivate,
       maxPlayers: 20,
+      prizeTitle: prizeTitle || 'Smart TV 55" 4K Crystal UHD',
+      prizeImageUrl:
+        prizeImageUrl ||
+        'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?auto=format&fit=crop&w=800&q=80',
       drawnBalls: [],
       currentBall: null,
       previousBalls: [],

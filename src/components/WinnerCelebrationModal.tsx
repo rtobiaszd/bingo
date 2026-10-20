@@ -6,6 +6,8 @@ import { WinnerAudit } from '../types/bingo';
 interface WinnerCelebrationModalProps {
   winner: WinnerAudit | null;
   isHost: boolean;
+  prizeTitle?: string;
+  prizeImageUrl?: string;
   onRestartRound: () => void;
   onClose: () => void;
 }
@@ -13,6 +15,8 @@ interface WinnerCelebrationModalProps {
 export const WinnerCelebrationModal: React.FC<WinnerCelebrationModalProps> = ({
   winner,
   isHost,
+  prizeTitle,
+  prizeImageUrl,
   onRestartRound,
   onClose,
 }) => {
@@ -150,6 +154,26 @@ export const WinnerCelebrationModal: React.FC<WinnerCelebrationModalProps> = ({
             <span className="inline-block mt-0.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-bold font-display">
               {winner.winningPattern}
             </span>
+          </div>
+        </div>
+
+        {/* Prize Award Card */}
+        <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-yellow-500/10 to-orange-500/10 border border-amber-400/40 mb-5 flex items-center gap-3 text-left">
+          <img
+            src={prizeImageUrl || 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?auto=format&fit=crop&w=400&q=80'}
+            alt={prizeTitle || 'Prêmio do Bingo'}
+            className="w-16 h-16 rounded-xl object-cover border border-amber-400/50 shadow-md shrink-0"
+          />
+          <div>
+            <span className="text-[10px] font-black uppercase text-amber-400 font-mono tracking-wider">
+              🎁 PRÊMIO CONQUISTADO
+            </span>
+            <p className="text-xs sm:text-sm font-black text-white font-display line-clamp-1">
+              {prizeTitle || 'Smart TV 55" 4K Crystal UHD'}
+            </p>
+            <p className="text-[11px] text-slate-300">
+              Parabéns! O prêmio foi auditado e garantido nesta rodada.
+            </p>
           </div>
         </div>
 

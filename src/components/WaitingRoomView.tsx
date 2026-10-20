@@ -103,6 +103,34 @@ export const WaitingRoomView: React.FC<WaitingRoomViewProps> = ({
         </div>
       </div>
 
+      {/* Prize Showcase Banner */}
+      <div className="bg-gradient-to-r from-amber-500/15 via-yellow-500/10 to-orange-500/10 border border-amber-400/30 rounded-3xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
+        <div className="flex items-center gap-4">
+          <img
+            src={room.prizeImageUrl || 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?auto=format&fit=crop&w=400&q=80'}
+            alt={room.prizeTitle || 'Prêmio Bingo'}
+            className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover border-2 border-amber-400/50 shadow-md shrink-0"
+          />
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 font-display px-2.5 py-0.5 rounded-full bg-amber-400/20 border border-amber-400/30">
+              🎁 PRÊMIO EM DISPUTA NESTA MESA
+            </span>
+            <h3 className="text-base sm:text-lg font-black text-white font-display mt-1">
+              {room.prizeTitle || 'Smart TV 55" 4K Crystal UHD'}
+            </h3>
+            <p className="text-xs text-slate-300">
+              O jogador que bater o Bingo primeiro levará o prêmio da rodada!
+            </p>
+          </div>
+        </div>
+
+        <div className="shrink-0 text-right">
+          <span className="px-3 py-1.5 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold font-mono">
+            Troféu & Premiação
+          </span>
+        </div>
+      </div>
+
       {/* Grid: Players Roster & Action Card */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Players List */}

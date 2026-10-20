@@ -8,11 +8,51 @@
         "uid": { "type": "string", "maxLength": 128 },
         "email": { "type": "string", "maxLength": 256 },
         "displayName": { "type": "string", "maxLength": 128 },
+        "nickname": { "type": "string", "maxLength": 64 },
+        "phone": { "type": "string", "maxLength": 32 },
+        "city": { "type": "string", "maxLength": 64 },
+        "luckyNumber": { "type": "number" },
         "photoURL": { "type": "string", "maxLength": 512 },
         "isAdmin": { "type": "boolean" },
+        "gamesPlayed": { "type": "number" },
+        "bingoWins": { "type": "number" },
         "createdAt": { "type": "string", "maxLength": 64 }
       },
       "required": ["uid", "email"]
+    },
+    "RegisteredPlayer": {
+      "title": "Registered Player",
+      "description": "Player profile registered in the club directory",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 128 },
+        "nickname": { "type": "string", "maxLength": 64 },
+        "avatar": { "type": "string", "maxLength": 256 },
+        "email": { "type": "string", "maxLength": 256 },
+        "phone": { "type": "string", "maxLength": 32 },
+        "city": { "type": "string", "maxLength": 64 },
+        "luckyNumber": { "type": "number" },
+        "gamesPlayed": { "type": "number" },
+        "bingoWins": { "type": "number" },
+        "registeredAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "name", "nickname", "avatar"]
+    },
+    "Prize": {
+      "title": "Bingo Prize",
+      "description": "Prizes awarded in bingo games with real images",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 128 },
+        "category": { "type": "string", "maxLength": 64 },
+        "imageUrl": { "type": "string", "maxLength": 512 },
+        "description": { "type": "string", "maxLength": 500 },
+        "estimatedValue": { "type": "string", "maxLength": 64 },
+        "badge": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "title", "imageUrl"]
     },
     "Room": {
       "title": "Bingo Room",
@@ -30,6 +70,9 @@
         "status": { "type": "string", "enum": ["WAITING", "PLAYING", "PAUSED", "FINISHED"] },
         "drawSpeedSeconds": { "type": "number" },
         "winningRule": { "type": "string", "maxLength": 32 },
+        "prizeId": { "type": "string", "maxLength": 128 },
+        "prizeTitle": { "type": "string", "maxLength": 128 },
+        "prizeImageUrl": { "type": "string", "maxLength": 512 },
         "drawnBalls": { "type": "array" },
         "currentBall": { "type": "number" },
         "isPrivate": { "type": "boolean" },
@@ -105,6 +148,14 @@
     "/users/{userId}": {
       "schema": "User",
       "description": "Collection of registered user profiles"
+    },
+    "/players/{playerId}": {
+      "schema": "RegisteredPlayer",
+      "description": "Directory of registered bingo club players"
+    },
+    "/prizes/{prizeId}": {
+      "schema": "Prize",
+      "description": "Catalog of prizes with pictures in dispute"
     },
     "/rooms/{roomId}": {
       "schema": "Room",
