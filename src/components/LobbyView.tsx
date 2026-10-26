@@ -340,6 +340,53 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
         )}
       </div>
 
+      {/* Banner de Cadastro de Novos Usuários */}
+      <div className="bg-gradient-to-r from-emerald-500/15 via-teal-500/10 to-slate-900/60 border border-emerald-500/30 rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-start sm:items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-400 to-teal-500 text-slate-950 flex items-center justify-center text-2xl shadow-lg shadow-emerald-500/25 shrink-0">
+            <UserPlus className="w-6 h-6 stroke-[2.5]" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm sm:text-base font-black text-white font-display">
+                Cadastro de Novos Usuários & Jogadores
+              </span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-400/40">
+                100% Gratuito
+              </span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-400/40">
+                ✓ Supabase + Firestore
+              </span>
+            </div>
+            <p className="text-xs text-slate-300 mt-1 max-w-xl font-display leading-relaxed">
+              Cadastre seu perfil oficial com nome, foto, WhatsApp, cidade e número da sorte para entrar nas rodadas, acumular vitórias no ranking e disputar prêmios reais!
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
+          {onOpenRegisterModal && (
+            <button
+              onClick={onOpenRegisterModal}
+              className="flex-1 md:flex-none px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 text-slate-950 font-black text-xs font-display tracking-wide shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>Cadastrar Novo Usuário</span>
+            </button>
+          )}
+          {onOpenPrizesModal && (
+            <button
+              onClick={onOpenPrizesModal}
+              className="px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-amber-300 border border-amber-400/30 text-xs font-bold font-display transition-all flex items-center gap-1.5 cursor-pointer"
+              title="Ver Galeria de Prêmios Reais"
+            >
+              <Gift className="w-4 h-4 text-amber-400" />
+              <span className="hidden sm:inline">Ver Prêmios</span>
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* ========================================================================= */}
       {/* TAB 1: SALAS ABERTAS (PÚBLICAS) COM CONTAGEM DE JOGADORES                 */}
       {/* ========================================================================= */}

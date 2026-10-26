@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { RegisteredPlayer } from '../types/bingo';
 import { firestoreService } from '../services/firestoreService';
+import { supabaseService } from '../services/supabaseService';
 import { useAuth } from '../context/AuthContext';
 import { AVATARS } from '../utils/themes';
 
@@ -92,6 +93,37 @@ export const PlayerRegistrationModal: React.FC<PlayerRegistrationModalProps> = (
     return () => unsubscribe();
   }, [isOpen]);
 
+  const handleFillSampleData = () => {
+    const samples = [
+      { n: 'Carlos Eduardo', nick: 'CaduSorte', city: 'Curitiba - PR', avatar: '🍀', lucky: 13 },
+      { n: 'Patrícia Silveira', nick: 'PatiBingo', city: 'São Paulo - SP', avatar: '👑', lucky: 7 },
+      { n: 'Marcos Vinícius', nick: 'Marquinhos', city: 'Belo Horizonte - MG', avatar: '🚀', lucky: 22 },
+      { n: 'Renata Albuquerque', nick: 'ReMega', city: 'Rio de Janeiro - RJ', avatar: '💎', lucky: 33 },
+      { n: 'Lucas Fernandes', nick: 'Luquinhas', city: 'Porto Alegre - RS', avatar: '🔥', lucky: 77 },
+      { n: 'Aline Santos', nick: 'AlineWin', city: 'Florianópolis - SC', avatar: '⭐', lucky: 11 },
+    ];
+    const picked = samples[Math.floor(Math.random() * samples.length)];
+    const unique = Math.floor(100 + Math.random() * 900);
+    setName(picked.n);
+    setNickname(`${picked.nick}${unique}`);
+    setEmail(`${picked.nick.toLowerCase()}${unique}@exemplo.com`);
+    setPhone(`(41) 9${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}`);
+    setCity(picked.city);
+    setLuckyNumber(picked.lucky);
+    setAvatar(picked.avatar);
+  };
+
+  const handleStartNewRegistration = () => {
+    setName('');
+    setNickname('');
+    setEmail('');
+    setPhone('');
+    setCity('');
+    setLuckyNumber(Math.floor(1 + Math.random() * 75));
+    setAvatar('👑');
+    setActiveTab('register');
+  };
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -122,6 +154,8 @@ export const PlayerRegistrationModal: React.FC<PlayerRegistrationModalProps> = (
       };
 
       await firestoreService.registerPlayer(playerRecord);
+      // Sincronizar simultaneamente com o banco Supabase
+      await supabaseService.savePlayer(playerRecord);
 
       // Atualiza também nome de jogador padrão no multiplayer
       if (typeof window !== 'undefined') {
@@ -133,7 +167,7 @@ export const PlayerRegistrationModal: React.FC<PlayerRegistrationModalProps> = (
         onPlayerRegistered(playerRecord);
       }
 
-      setSuccessMessage('🎉 Cadastro realizado com sucesso! Seus dados foram salvos no clube.');
+      setSuccessMessage('🎉 Cadastro realizado com sucesso! Seus dados foram salvos no clube e sincronizados no Supabase.');
       setTimeout(() => {
         setSuccessMessage(null);
       }, 3500);
@@ -382,43 +416,66 @@ export const PlayerRegistrationModal: React.FC<PlayerRegistrationModalProps> = (
               </div>
 
               {/* Submit Buttons */}
-              <div className="pt-2 flex items-center justify-end gap-3">
+              <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
                 <button
                   type="button"
-                  onClick={onClose}
-                  className="px-4 py-2.5 rounded-xl border border-white/10 text-xs font-bold text-slate-300 hover:bg-white/5 transition-all"
+                  onClick={handleFillSampleData}
+                  className="px-3.5 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-amber-300 text-xs font-bold font-display flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  title="Preencher com dados aleatórios de teste"
                 >
-                  Cancelar
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Preencher Exemplo</span>
                 </button>
 
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500 hover:from-amber-300 hover:to-orange-400 text-slate-950 font-black text-xs font-display tracking-wide shadow-lg shadow-amber-500/25 active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50"
-                >
-                  {isSaving ? (
-                    <span>Salvando...</span>
-                  ) : (
-                    <>
-                      <Sparkles className="w-4 h-4 fill-slate-950" />
-                      <span>Salvar Cadastro de Jogador</span>
-                    </>
-                  )}
-                </button>
+                <div className="flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-4 py-2.5 rounded-xl border border-white/10 text-xs font-bold text-slate-300 hover:bg-white/5 transition-all"
+                  >
+                    Cancelar
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={isSaving}
+                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500 hover:from-amber-300 hover:to-orange-400 text-slate-950 font-black text-xs font-display tracking-wide shadow-lg shadow-amber-500/25 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {isSaving ? (
+                      <span>Salvando no Supabase & Firestore...</span>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 fill-slate-950" />
+                        <span>Salvar Cadastro de Jogador</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </form>
           ) : (
             /* Directory / Community Tab */
             <div className="space-y-4">
-              <div className="relative">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={searchFilter}
-                  onChange={(e) => setSearchFilter(e.target.value)}
-                  placeholder="Pesquisar jogadores por nome, apelido ou cidade..."
-                  className="w-full bg-slate-950/60 border border-white/10 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
-                />
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <div className="flex-1 relative">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={searchFilter}
+                    onChange={(e) => setSearchFilter(e.target.value)}
+                    placeholder="Pesquisar jogadores por nome, apelido ou cidade..."
+                    className="w-full bg-slate-950/60 border border-white/10 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleStartNewRegistration}
+                  className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 shrink-0"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>+ Cadastrar Novo Usuário</span>
+                </button>
               </div>
 
               <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">

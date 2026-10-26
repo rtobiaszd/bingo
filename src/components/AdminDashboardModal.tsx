@@ -31,9 +31,14 @@ import {
   Plus,
   Download,
   Tag,
+  Database,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { firestoreService, FirestorePlayerCard } from '../services/firestoreService';
+import { supabaseService } from '../services/supabaseService';
+import { testSupabaseConnection, SUPABASE_PROJECT_REF } from '../lib/supabase';
 import { MASTER_ADMIN_EMAIL } from '../lib/firebase';
 import { get75BallLetter } from '../utils/bingoRules';
 import { RegisteredPlayer, PrizeItem } from '../types/bingo';
@@ -306,13 +311,72 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
     };
 
     await firestoreService.registerPlayer(playerRecord);
+    await supabaseService.savePlayer(playerRecord);
     setIsAddingPlayer(false);
     setNewPlayerName('');
     setNewPlayerNick('');
     setNewPlayerEmail('');
     setNewPlayerPhone('');
     setNewPlayerCity('');
-    showFeedback(`Jogador "${playerRecord.nickname}" cadastrado com sucesso!`);
+    showFeedback(`Jogador "${playerRecord.nickname}" cadastrado e sincronizado no Supabase & Firestore!`);
+  };
+
+  // Bulk generate players (10, 20, 50) para teste de escala
+  const [isGeneratingBulk, setIsGeneratingBulk] = useState(false);
+  const handleGenerateMockPlayers = async (count: number) => {
+    setIsGeneratingBulk(true);
+    const mockNames = [
+      { name: 'Lucas Oliveira', nick: 'Luquinhas', city: 'Curitiba - PR', avatar: '👑' },
+      { name: 'Mariana Souza', nick: 'MariBingo', city: 'São Paulo - SP', avatar: '⭐' },
+      { name: 'Gabriel Santos', nick: 'GabiSorte', city: 'Rio de Janeiro - RJ', avatar: '🔥' },
+      { name: 'Juliana Lima', nick: 'JuVencedora', city: 'Belo Horizonte - MG', avatar: '🍀' },
+      { name: 'Rodrigo Costa', nick: 'RodrigoShow', city: 'Florianópolis - SC', avatar: '💎' },
+      { name: 'Camila Rocha', nick: 'MilaBingo', city: 'Porto Alegre - RS', avatar: '🚀' },
+      { name: 'Matheus Pereira', nick: 'Theus99', city: 'Brasília - DF', avatar: '🎯' },
+      { name: 'Larissa Carvalho', nick: 'LariSorte', city: 'Salvador - BA', avatar: '🦁' },
+      { name: 'Bruno Ferreira', nick: 'Brunao', city: 'Fortaleza - CE', avatar: '⚡' },
+      { name: 'Beatriz Alves', nick: 'BiaMega', city: 'Recife - PE', avatar: '🏆' },
+      { name: 'Thiago Ribeiro', nick: 'Thiagao', city: 'Goiânia - GO', avatar: '🎩' },
+      { name: 'Fernanda Martins', nick: 'FerTop', city: 'Campinas - SP', avatar: '🐺' },
+      { name: 'Gustavo Barbosa', nick: 'GugaShow', city: 'Santos - SP', avatar: '👑' },
+      { name: 'Aline Dias', nick: 'AlineSorte', city: 'Londrina - PR', avatar: '⭐' },
+      { name: 'Rafael Gomes', nick: 'RafaBingo', city: 'Maringá - PR', avatar: '🔥' },
+      { name: 'Amanda Castro', nick: 'Amandinha', city: 'Joinville - SC', avatar: '🍀' },
+      { name: 'Felipe Araújo', nick: 'LipeVence', city: 'Caxias do Sul - RS', avatar: '💎' },
+      { name: 'Natália Cardoso', nick: 'NatiBingo', city: 'Niterói - RJ', avatar: '🚀' },
+      { name: 'Leonardo Teixeira', nick: 'LeoMaster', city: 'Vitória - ES', avatar: '🎯' },
+      { name: 'Carolina Moreira', nick: 'CarolTop', city: 'Manaus - AM', avatar: '🦁' },
+    ];
+
+    try {
+      let created = 0;
+      for (let i = 0; i < count; i++) {
+        const template = mockNames[i % mockNames.length];
+        const uniqueSuffix = Math.floor(100 + Math.random() * 900);
+        const playerRecord: RegisteredPlayer = {
+          id: `player_mock_${Date.now()}_${i}_${Math.random().toString(36).substring(2, 6)}`,
+          name: `${template.name} ${i >= mockNames.length ? `(${i + 1})` : ''}`.trim(),
+          nickname: `${template.nick}${i >= mockNames.length ? i + 1 : ''}`,
+          avatar: template.avatar,
+          email: `${template.nick.toLowerCase()}${uniqueSuffix}@exemplo.com`,
+          phone: `(41) 9${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}`,
+          city: template.city,
+          luckyNumber: Math.floor(1 + Math.random() * 75),
+          gamesPlayed: Math.floor(Math.random() * 15),
+          bingoWins: Math.floor(Math.random() * 4),
+          registeredAt: new Date(Date.now() - Math.floor(Math.random() * 7 * 86400000)).toISOString(),
+        };
+
+        await firestoreService.registerPlayer(playerRecord);
+        await supabaseService.savePlayer(playerRecord);
+        created++;
+      }
+      showFeedback(`🎉 ${created} novos jogadores cadastrados e sincronizados no Firestore e Supabase!`);
+    } catch (e: any) {
+      showFeedback(`Erro ao gerar usuários: ${e?.message || 'Tente novamente'}`);
+    } finally {
+      setIsGeneratingBulk(false);
+    }
   };
 
   // Add new prize from Admin
@@ -848,7 +912,39 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                     />
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Botões de Escala para teste de 10, 20, 50 jogadores */}
+                    <div className="hidden md:flex items-center gap-1 bg-slate-900 border border-slate-700/80 p-1 rounded-xl">
+                      <span className="text-[10px] font-mono text-slate-400 px-1 font-bold">Escala:</span>
+                      <button
+                        type="button"
+                        disabled={isGeneratingBulk}
+                        onClick={() => handleGenerateMockPlayers(10)}
+                        className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 font-mono text-[11px] font-bold transition-all disabled:opacity-50"
+                        title="Cadastrar 10 jogadores teste no Supabase e Firestore"
+                      >
+                        +10
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isGeneratingBulk}
+                        onClick={() => handleGenerateMockPlayers(20)}
+                        className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 font-mono text-[11px] font-bold transition-all disabled:opacity-50"
+                        title="Cadastrar 20 jogadores teste no Supabase e Firestore"
+                      >
+                        +20
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isGeneratingBulk}
+                        onClick={() => handleGenerateMockPlayers(50)}
+                        className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 font-mono text-[11px] font-bold transition-all disabled:opacity-50"
+                        title="Cadastrar 50 jogadores teste no Supabase e Firestore"
+                      >
+                        +50
+                      </button>
+                    </div>
+
                     <button
                       onClick={handleExportPlayersCSV}
                       className="px-3.5 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm"
