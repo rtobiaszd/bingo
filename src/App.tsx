@@ -290,6 +290,7 @@ export default function App() {
             initialCode={initialRoomCode}
             onOpenRegisterModal={() => setIsPlayerRegOpen(true)}
             onOpenPrizesModal={() => setIsPrizeShowcaseOpen(true)}
+            onOpenAdminDashboard={() => setIsAdminDashboardOpen(true)}
           />
         ) : room.status === 'WAITING' ? (
           /* Pre-Game: Waiting Room View */

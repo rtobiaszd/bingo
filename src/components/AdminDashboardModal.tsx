@@ -34,16 +34,19 @@ import {
   Database,
   Copy,
   Check,
+  ExternalLink,
+  UploadCloud,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { firestoreService, FirestorePlayerCard } from '../services/firestoreService';
 import { supabaseService } from '../services/supabaseService';
-import { testSupabaseConnection, SUPABASE_PROJECT_REF } from '../lib/supabase';
+import { testSupabaseConnection, SUPABASE_PROJECT_REF, SUPABASE_URL } from '../lib/supabase';
 import { MASTER_ADMIN_EMAIL } from '../lib/firebase';
 import { get75BallLetter } from '../utils/bingoRules';
 import { RegisteredPlayer, PrizeItem } from '../types/bingo';
 import { DEFAULT_PRIZES } from '../utils/prizes';
 import { AVATARS } from '../utils/themes';
+import { SUPABASE_SQL_SCRIPT } from '../utils/supabaseSql';
 
 interface AdminDashboardModalProps {
   isOpen: boolean;
@@ -57,7 +60,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
   currentRoomId,
 }) => {
   const { user, isMasterAdmin, signInWithGoogle } = useAuth();
-  const [adminTab, setAdminTab] = useState<'rooms' | 'players' | 'prizes'>('rooms');
+  const [adminTab, setAdminTab] = useState<'rooms' | 'players' | 'prizes' | 'database'>('rooms');
 
   // Rooms & Cards State
   const [allRooms, setAllRooms] = useState<any[]>([]);
@@ -438,6 +441,63 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
     showFeedback('Lista de jogadores exportada com sucesso em CSV!');
   };
 
+  // Supabase management & connection status
+  const [supabaseStatus, setSupabaseStatus] = useState<{
+    checking: boolean;
+    tested: boolean;
+    success: boolean;
+    message: string;
+  }>({
+    checking: false,
+    tested: false,
+    success: false,
+    message: 'Clique em "Testar Conexão" para verificar a resposta do banco Supabase.',
+  });
+  const [copiedSql, setCopiedSql] = useState(false);
+  const [isSyncingAllToSupabase, setIsSyncingAllToSupabase] = useState(false);
+
+  const handleTestSupabase = async () => {
+    setSupabaseStatus({
+      checking: true,
+      tested: false,
+      success: false,
+      message: 'Consultando API do Supabase...',
+    });
+    const res = await testSupabaseConnection();
+    setSupabaseStatus({
+      checking: false,
+      tested: true,
+      success: res.success,
+      message: res.message,
+    });
+  };
+
+  const handleCopySql = () => {
+    navigator.clipboard.writeText(SUPABASE_SQL_SCRIPT);
+    setCopiedSql(true);
+    setTimeout(() => setCopiedSql(false), 3000);
+    showFeedback('Script SQL copiado com sucesso!');
+  };
+
+  const handleSyncAllToSupabase = async () => {
+    setIsSyncingAllToSupabase(true);
+    try {
+      let count = 0;
+      for (const player of registeredPlayers) {
+        await supabaseService.savePlayer(player);
+        count++;
+      }
+      for (const prize of prizesList) {
+        await supabaseService.savePrize(prize);
+      }
+      showFeedback(`✓ ${count} jogadores e catálogo sincronizados no Supabase!`);
+    } catch (e: any) {
+      showFeedback(`Erro ao sincronizar: ${e?.message || 'Verifique se as tabelas existem'}`);
+    } finally {
+      setIsSyncingAllToSupabase(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -595,6 +655,18 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
               >
                 <Gift className="w-4 h-4" />
                 <span>Catálogo de Prêmios ({prizesList.length})</span>
+              </button>
+
+              <button
+                onClick={() => setAdminTab('database')}
+                className={`pb-2 px-3 text-xs font-bold font-display transition-all border-b-2 flex items-center gap-2 ${
+                  adminTab === 'database'
+                    ? 'border-cyan-400 text-cyan-300'
+                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Database className="w-4 h-4" />
+                <span>Banco Supabase & SQL</span>
               </button>
             </div>
 
@@ -1274,6 +1346,170 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* TAB 4: SUPABASE DATABASE & SQL ACTIVATION */}
+            {adminTab === 'database' && (
+              <div className="space-y-6 animate-fade-in">
+                {/* Header info */}
+                <div className="bg-gradient-to-r from-cyan-500/15 via-blue-500/10 to-slate-900 border border-cyan-500/30 rounded-2xl p-5 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3.5">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyan-400 to-blue-500 text-slate-950 flex items-center justify-center text-2xl shadow-lg shadow-cyan-500/25 shrink-0">
+                      <Database className="w-6 h-6 stroke-[2.5]" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-base font-black text-white font-display">
+                          Conexão & Ativação do Supabase
+                        </h4>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-400/40">
+                          Projeto: {SUPABASE_PROJECT_REF}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-300 mt-1 max-w-xl font-display leading-relaxed">
+                        Para o banco de dados PostgreSQL do Supabase ficar 100% funcional, basta executar o script SQL oficial no painel do Supabase uma única vez para criar as tabelas e permissões de acesso (RLS).
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
+                    <button
+                      type="button"
+                      onClick={handleTestSupabase}
+                      disabled={supabaseStatus.checking}
+                      className="px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs font-display tracking-wide shadow-lg shadow-cyan-500/25 transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50"
+                    >
+                      <Activity className="w-4 h-4" />
+                      <span>{supabaseStatus.checking ? 'Testando...' : 'Testar Conexão'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleSyncAllToSupabase}
+                      disabled={isSyncingAllToSupabase}
+                      className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-bold text-xs font-display transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50"
+                      title="Envia todos os jogadores e prêmios do Firestore para o Supabase"
+                    >
+                      <UploadCloud className="w-4 h-4 text-emerald-400" />
+                      <span>{isSyncingAllToSupabase ? 'Sincronizando...' : 'Sincronizar Tudo'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Connection Status Live Banner */}
+                <div
+                  className={`p-4 rounded-2xl border transition-all ${
+                    supabaseStatus.tested
+                      ? supabaseStatus.success
+                        ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300'
+                        : 'bg-amber-950/40 border-amber-500/50 text-amber-300'
+                      : 'bg-slate-800/40 border-slate-700 text-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <span
+                        className={`w-3 h-3 rounded-full ${
+                          supabaseStatus.tested
+                            ? supabaseStatus.success
+                              ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.8)]'
+                              : 'bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.8)]'
+                            : 'bg-slate-500'
+                        }`}
+                      />
+                      <span className="font-bold text-xs uppercase font-mono tracking-wider">
+                        Status do Banco Supabase:
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-mono opacity-80">{SUPABASE_URL}</span>
+                  </div>
+                  <p className="text-xs mt-2 font-display leading-relaxed">
+                    {supabaseStatus.message}
+                  </p>
+                </div>
+
+                {/* 3 Step Activation Guide */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-slate-800/50 border border-slate-700/70 rounded-2xl p-4 space-y-2">
+                    <div className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 flex items-center justify-center font-bold font-mono text-sm">
+                      1
+                    </div>
+                    <h5 className="text-xs font-bold text-white font-display">Abra o SQL Editor</h5>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Acesse a aba <strong>SQL Editor</strong> dentro do painel do seu projeto no Supabase.
+                    </p>
+                    <a
+                      href={`https://supabase.com/dashboard/project/${SUPABASE_PROJECT_REF}/sql/new`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs text-cyan-400 hover:text-cyan-300 font-bold underline mt-1"
+                    >
+                      <span>Abrir SQL Editor no Supabase</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+
+                  <div className="bg-slate-800/50 border border-slate-700/70 rounded-2xl p-4 space-y-2">
+                    <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center justify-center font-bold font-mono text-sm">
+                      2
+                    </div>
+                    <h5 className="text-xs font-bold text-white font-display">Copie o Script SQL</h5>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Clique no botão abaixo para copiar o script completo com criação das tabelas <code className="text-amber-300">players</code> e <code className="text-amber-300">prizes</code> e regras RLS.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleCopySql}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 text-amber-300 text-xs font-bold transition-all cursor-pointer"
+                    >
+                      {copiedSql ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedSql ? 'Copiado!' : 'Copiar Script SQL'}</span>
+                    </button>
+                  </div>
+
+                  <div className="bg-slate-800/50 border border-slate-700/70 rounded-2xl p-4 space-y-2">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center justify-center font-bold font-mono text-sm">
+                      3
+                    </div>
+                    <h5 className="text-xs font-bold text-white font-display">Cole e Clique em RUN</h5>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Cole o script na janela do SQL Editor e clique no botão verde <strong>Run</strong>. Pronto! O banco estará 100% funcional.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleTestSupabase}
+                      className="inline-flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 font-bold underline mt-1"
+                    >
+                      <span>Verificar agora</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* SQL Code Box with 1-Click Copy */}
+                <div className="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+                  <div className="bg-slate-900/80 px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-bold text-slate-300">supabase-schema.sql</span>
+                      <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400">
+                        PostgreSQL
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleCopySql}
+                      className="px-3 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/30 text-cyan-300 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      {copiedSql ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedSql ? 'Copiado para o Teclado!' : 'Copiar Script SQL'}</span>
+                    </button>
+                  </div>
+
+                  <pre className="p-4 text-xs font-mono text-cyan-200/90 overflow-x-auto max-h-72 leading-relaxed selection:bg-cyan-500/30">
+                    {SUPABASE_SQL_SCRIPT}
+                  </pre>
                 </div>
               </div>
             )}
